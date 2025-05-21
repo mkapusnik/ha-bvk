@@ -1,0 +1,14 @@
+{
+  "domain": "bvk",
+  "name": "BVK",
+  "codeowners": ["@username"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/username/bvk",
+  "homekit": {},
+  "iot_class": "local_polling",
+  "requirements": [],
+  "ssdp": [],
+  "zeroconf": [],
+  "version": "0.1.0"
+}
