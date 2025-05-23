@@ -1,14 +1,12 @@
 {
   "domain": "bvk",
-  "name": "BVK",
-  "codeowners": ["@username"],
-  "config_flow": true,
+  "name": "BVK Water Meters",
+  "codeowners": ["@mkapusnik"],
   "dependencies": [],
-  "documentation": "https://github.com/username/bvk",
-  "homekit": {},
+  "documentation": "https://github.com/mkapusnik/ha-bvk",
   "iot_class": "local_polling",
+  "integration_type": "hub",
+  "config_flow": true,
   "requirements": [],
-  "ssdp": [],
-  "zeroconf": [],
   "version": "0.1.0"
 }
