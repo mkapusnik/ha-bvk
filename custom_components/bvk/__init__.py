@@ -1,8 +1,7 @@
-"""
-Custom component for Home Assistant.
+"""Custom integration to integrate BVK's smart water meters with Home Assistant.
 
-For more details about this component, please refer to the documentation at
-https://github.com/username/bvk
+For more details about this integration, please refer to
+https://github.com/mkapusnik/ha-bvk
 """
 import logging
 from homeassistant.core import HomeAssistant
@@ -12,11 +11,7 @@ from homeassistant.const import Platform
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-
-# List of platforms to support. There should be a matching .py file for each,
-# eg. switch.py and sensor.py
 PLATFORMS = [Platform.SENSOR]
-
 
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up this integration using YAML is not supported."""

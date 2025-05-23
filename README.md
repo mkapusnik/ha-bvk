@@ -1,6 +1,6 @@
-# BVK for Home Assistant
+# BVK Water Meter for Home Assistant
 
-This is a custom component for Home Assistant that provides a basic integration template.
+This is a custom component for Home Assistant that provides integration with BVK smart meters.
 
 ## Installation
 
