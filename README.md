@@ -1,3 +1,8 @@
+# !!! Work in Progress !!! 
+
+This project is still in an early stage of development. It's unlikely it will work for you at this moment!
+Feel free to watch my progress and check again later
+
 # BVK Water Meter for Home Assistant
 
 This is a custom component for Home Assistant that provides integration with BVK smart meters.
@@ -34,6 +39,7 @@ The integration can be configured through the Home Assistant UI:
 
 ## Features
 
+For prototyping purposes:
 - Provides a basic temperature sensor with a static value (42°C)
 - Updates every 5 minutes
 
