@@ -37,15 +37,6 @@ The integration can be configured through the Home Assistant UI:
 - Provides a basic temperature sensor with a static value (42°C)
 - Updates every 5 minutes
 
-## Development
-
-This integration is designed to be a starting point for creating your own custom integrations. Here are some tips for customizing it:
-
-1. Rename the `bvk` directory and update all references to "bvk" in the code.
-2. Update the `manifest.json` file with your own information.
-3. Modify the `sensor.py` file to implement your own sensor logic.
-4. Update the translations in the `translations` directory.
-
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
