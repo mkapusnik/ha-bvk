@@ -4,10 +4,16 @@ import logging
 import sys
 import os
 import sys
+from pathlib import Path
+from dotenv import load_dotenv
 
 # Add the parent directory to the path so we can import the custom component
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from custom_components.bvk.api import BVKApiClient
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # Set up logging
 logging.basicConfig(
@@ -19,14 +25,22 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def test_api_client():
-    """Test the BVK API client."""
-    # Replace with your actual credentials
-    username = "your_username"
-    password = "your_password"
-    
+    """Test the BVK API client.
+
+    Loads credentials from .env file. Create a .env file in the test directory
+    based on the .env.example template.
+    """
+    # Get credentials from environment variables
+    username = os.getenv("BVK_USERNAME")
+    password = os.getenv("BVK_PASSWORD")
+
+    if not username or not password:
+        _LOGGER.error("Missing credentials. Please set BVK_USERNAME and BVK_PASSWORD in .env file")
+        return
+
     _LOGGER.info("Creating BVK API client")
     api_client = BVKApiClient(username, password)
-    
+
     try:
         _LOGGER.info("Getting data from BVK API")
         data = await api_client.async_get_data()

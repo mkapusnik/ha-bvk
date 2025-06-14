@@ -1,3 +1,5 @@
 /.idea/
 /test/_trial_temp/
 __pycache__/
+# Environment files with credentials
+/test/.env
