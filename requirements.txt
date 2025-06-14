@@ -1,1 +1,3 @@
 homeassistant
+requests
+beautifulsoup4
