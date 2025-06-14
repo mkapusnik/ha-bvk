@@ -178,18 +178,27 @@ class BVKApiClient:
             all_links = soup.find_all('a', href=lambda href: href and href.strip())
             _LOGGER.debug(f"Found {len(all_links)} links on the main info page")
 
-            # Look for links containing the target domain
-            links = soup.find_all('a', href=lambda href: href and BVK_TARGET_DOMAIN in href)
+            # First, look specifically for the target URL with Login.aspx
+            target_url = "https://cz-sitr.suezsmartsolutions.com/eMIS.SE_BVK/Login.aspx"
+            links = soup.find_all('a', href=lambda href: href and target_url in href)
+
+            if links:
+                _LOGGER.debug(f"Found specific target URL: {target_url}")
+
+            # If specific URL not found, look for links containing the target domain
+            if not links:
+                _LOGGER.debug("Specific target URL not found, looking for any links with target domain")
+                links = soup.find_all('a', href=lambda href: href and BVK_TARGET_DOMAIN in href)
 
             # If no direct links to target domain, look for any links that might contain 'token'
             if not links:
                 _LOGGER.debug("No direct links to SUEZ Smart Solutions found, looking for alternative links with token")
                 links = soup.find_all('a', href=lambda href: href and ('token' in href.lower() or 'auth' in href.lower()))
 
-            # If still no links, look for iframe sources that might contain the target domain
+            # If still no links, look for iframe sources that might contain the target domain or specific URL
             if not links:
                 _LOGGER.debug("No links with token found, checking iframes")
-                iframes = soup.find_all('iframe', src=lambda src: src and (BVK_TARGET_DOMAIN in src or 'token' in src.lower()))
+                iframes = soup.find_all('iframe', src=lambda src: src and (BVK_TARGET_DOMAIN in src or target_url in src or 'token' in src.lower()))
                 if iframes:
                     _LOGGER.debug(f"Found {len(iframes)} iframes that might contain token")
                     # Convert iframe src to links for consistent processing
