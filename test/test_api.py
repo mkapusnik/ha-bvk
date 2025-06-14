@@ -2,6 +2,11 @@
 import asyncio
 import logging
 import sys
+import os
+import sys
+
+# Add the parent directory to the path so we can import the custom component
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from custom_components.bvk.api import BVKApiClient
 
 # Set up logging

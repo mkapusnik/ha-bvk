@@ -16,18 +16,20 @@ with a token parameter in the URL.
 
 ## Testing
 
-You can test the API client independently using the `test_api.py` script in the root directory:
+You can test the API client independently using the `test_api.py` script in the `test` directory:
 
 ```bash
-python test_api.py
+python test\test_api.py
 ```
 
 Make sure to update the username and password in the script before running it.
 
+Note: The API test requires the Home Assistant libraries to be available in your Python environment, as it imports from the custom component which depends on Home Assistant.
+
 For testing just the token extraction logic, you can use the `test_token_extraction.py` script:
 
 ```bash
-python test_token_extraction.py
+python test\test_token_extraction.py
 ```
 
-This script focuses specifically on the login and token extraction process.
+This script focuses specifically on the login and token extraction process and does not require the Home Assistant libraries.

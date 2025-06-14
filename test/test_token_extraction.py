@@ -2,9 +2,13 @@
 import asyncio
 import logging
 import sys
+import os
 import aiohttp
 from bs4 import BeautifulSoup
 import re
+
+# Add the parent directory to the path in case we need to import from the custom component
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Set up logging
 logging.basicConfig(
@@ -173,8 +177,8 @@ async def extract_token(username, password):
 async def main():
     """Run the token extraction test."""
     # Replace with your actual credentials
-    username = "michal.kapusnik@gmail.com"
-    password = "cb7ee1a9f9"
+    username = "your_username"
+    password = "your_password"
     
     _LOGGER.info("Starting token extraction test")
     try:
