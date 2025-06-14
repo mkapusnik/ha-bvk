@@ -83,9 +83,9 @@ class BVKSensor(CoordinatorEntity, SensorEntity):
     """Representation of a BVK Sensor."""
 
     _attr_has_entity_name = True
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_device_class = SensorDeviceClass.TEMPERATURE
-    _attr_native_unit_of_measurement = "°C"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_device_class = SensorDeviceClass.WATER
+    _attr_native_unit_of_measurement = "m³"
 
     def __init__(
         self, coordinator: BVKCoordinator, name: str, entry_id: str
@@ -93,7 +93,7 @@ class BVKSensor(CoordinatorEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id}_sensor"
-        self._attr_name = "Temperature"
+        self._attr_name = "Water Consumption"
 
         # Set device info
         self._attr_device_info = {
