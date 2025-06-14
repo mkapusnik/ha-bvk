@@ -19,7 +19,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .const import DOMAIN, CONF_NAME
+from .const import DOMAIN, CONF_NAME, CONF_USERNAME, CONF_PASSWORD
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,8 +35,12 @@ async def async_setup_entry(
     """Set up the sensor platform."""
     name = entry.data[CONF_NAME]
 
+    # Extract credentials from entry data
+    username = entry.data[CONF_USERNAME]
+    password = entry.data[CONF_PASSWORD]
+
     # Create update coordinator
-    coordinator = BVKCoordinator(hass)
+    coordinator = BVKCoordinator(hass, username, password)
 
     # Fetch initial data so we have data when entities subscribe
     await coordinator.async_config_entry_first_refresh()
@@ -48,8 +52,10 @@ async def async_setup_entry(
 class BVKCoordinator(DataUpdateCoordinator):
     """BVK custom coordinator."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(self, hass: HomeAssistant, username: str, password: str) -> None:
         """Initialize coordinator."""
+        self._username = username
+        self._password = password
         super().__init__(
             hass,
             _LOGGER,
@@ -60,7 +66,16 @@ class BVKCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from API."""
         # TODO: Implement API call or data retrieval logic here
+        # Use self._username and self._password for authentication
+        # Example of how this might be implemented:
+        # async with aiohttp.ClientSession() as session:
+        #     auth_data = {"username": self._username, "password": self._password}
+        #     async with session.post("https://api.example.com/auth", json=auth_data) as resp:
+        #         token = await resp.json()
+        #         # Use token for subsequent API calls
+
         # This is a placeholder that returns a static value
+        _LOGGER.debug("Using credentials: %s / %s", self._username, self._password)
         return {"value": 42}
 
 

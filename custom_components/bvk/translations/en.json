@@ -5,7 +5,9 @@
         "title": "BVK",
         "description": "Set up BVK to integrate with Home Assistant.",
         "data": {
-          "name": "Name"
+          "name": "Name",
+          "username": "Username",
+          "password": "Password"
         }
       }
     },
