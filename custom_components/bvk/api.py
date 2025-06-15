@@ -171,75 +171,109 @@ class BVKApiClient:
             main_info_response = await self.session.get(BVK_MAIN_INFO_URL)
             main_info_page = await main_info_response.text()
 
-            # Step 3: Find the icon with link to SUEZ Smart Solutions
-            soup = BeautifulSoup(main_info_page, 'html.parser')
+            # Step 3: Find the authentication token in the page
+            _LOGGER.debug("Searching for token directly in the HTML")
 
-            # Log all links on the page for debugging
-            all_links = soup.find_all('a', href=lambda href: href and href.strip())
-            _LOGGER.debug(f"Found {len(all_links)} links on the main info page")
-
-            # First, look specifically for the target URL with Login.aspx
-            target_url = "https://cz-sitr.suezsmartsolutions.com/eMIS.SE_BVK/Login.aspx"
-            links = soup.find_all('a', href=lambda href: href and target_url in href)
-
-            if links:
-                _LOGGER.debug(f"Found specific target URL: {target_url}")
-
-            # If specific URL not found, look for links containing the target domain
-            if not links:
-                _LOGGER.debug("Specific target URL not found, looking for any links with target domain")
-                links = soup.find_all('a', href=lambda href: href and BVK_TARGET_DOMAIN in href)
-
-            # If no direct links to target domain, look for any links that might contain 'token'
-            if not links:
-                _LOGGER.debug("No direct links to SUEZ Smart Solutions found, looking for alternative links with token")
-                links = soup.find_all('a', href=lambda href: href and ('token' in href.lower() or 'auth' in href.lower()))
-
-            # If still no links, look for links with specific class "LinkEmis" or ID containing "btnPortalEmis"
-            if not links:
-                _LOGGER.debug("No links with token found, checking for links with class 'LinkEmis' or ID 'btnPortalEmis'")
-                links = soup.find_all('a', class_="LinkEmis")
-                if not links:
-                    links = soup.find_all('a', id=lambda id: id and 'btnPortalEmis' in id)
-                if links:
-                    _LOGGER.debug(f"Found {len(links)} links with specific class or ID")
-
-            # If still no links, look for iframe sources that might contain the target domain or specific URL
-            if not links:
-                _LOGGER.debug("No links with specific class or ID found, checking iframes")
-                iframes = soup.find_all('iframe', src=lambda src: src and (BVK_TARGET_DOMAIN in src or target_url in src or 'token' in src.lower()))
-                if iframes:
-                    _LOGGER.debug(f"Found {len(iframes)} iframes that might contain token")
-                    # Convert iframe src to links for consistent processing
-                    links = [{'href': iframe['src']} for iframe in iframes]
-
-            if not links:
-                # Log some of the page content for debugging
-                _LOGGER.debug(f"Main info page HTML: {main_info_page[:500]}...")
-                raise Exception("Link to SUEZ Smart Solutions not found")
-
-            # Extract the link with authentication token
-            target_link = links[0]['href']
-            _LOGGER.debug(f"Found target link: {target_link}")
-
-            # Try different patterns to extract the authentication token
+            # Define patterns to search for in the HTML
             token_patterns = [
-                r'token=([^&]+)',  # Standard token format
-                r'auth=([^&]+)',   # Alternative auth parameter
-                r'jwt=([^&]+)',    # JWT token format
-                r'access_token=([^&]+)'  # OAuth style token
+                r'token=([^&"\']+)',  # Standard token format
+                r'auth=([^&"\']+)',   # Alternative auth parameter
+                r'jwt=([^&"\']+)',    # JWT token format
+                r'access_token=([^&"\']+)'  # OAuth style token
             ]
 
+            # Search for the token in the entire HTML first
             token_match = None
             for pattern in token_patterns:
-                match = re.search(pattern, target_link)
-                if match:
-                    token_match = match
-                    _LOGGER.debug(f"Token found using pattern: {pattern}")
+                matches = re.findall(pattern, main_info_page)
+                if matches:
+                    # Use the first match
+                    token_match = re.search(pattern, main_info_page)
+                    _LOGGER.debug(f"Token found directly in HTML using pattern: {pattern}")
                     break
 
             if not token_match:
-                raise Exception("Authentication token not found in link")
+                _LOGGER.debug("Token not found directly in HTML, trying to find it in specific elements")
+                soup = BeautifulSoup(main_info_page, 'html.parser')
+
+                # Log all links on the page for debugging
+                all_links = soup.find_all('a', href=lambda href: href and href.strip())
+                _LOGGER.debug(f"Found {len(all_links)} links on the main info page")
+
+                # Look for links with token in href
+                links_with_token = []
+                for link in all_links:
+                    link_href = link.get('href', '')
+                    if any(re.search(pattern, link_href) for pattern in token_patterns):
+                        links_with_token.append(link)
+
+                if links_with_token:
+                    _LOGGER.debug(f"Found {len(links_with_token)} links containing token patterns")
+                    # Extract the token from the first link
+                    link_href = links_with_token[0].get('href', '')
+                    for pattern in token_patterns:
+                        match = re.search(pattern, link_href)
+                        if match:
+                            token_match = match
+                            _LOGGER.debug(f"Token found in link using pattern: {pattern}")
+                            break
+
+                # If still no token found, try the original approach with specific links
+                if not token_match:
+                    # First, look specifically for the target URL with Login.aspx
+                    target_url = "https://cz-sitr.suezsmartsolutions.com/eMIS.SE_BVK/Login.aspx"
+                    links = soup.find_all('a', href=lambda href: href and target_url in href)
+
+                    if links:
+                        _LOGGER.debug(f"Found specific target URL: {target_url}")
+
+                    # If specific URL not found, look for links containing the target domain
+                    if not links:
+                        _LOGGER.debug("Specific target URL not found, looking for any links with target domain")
+                        links = soup.find_all('a', href=lambda href: href and BVK_TARGET_DOMAIN in href)
+
+                    # If no direct links to target domain, look for any links that might contain 'token'
+                    if not links:
+                        _LOGGER.debug("No direct links to SUEZ Smart Solutions found, looking for alternative links with token")
+                        links = soup.find_all('a', href=lambda href: href and ('token' in href.lower() or 'auth' in href.lower()))
+
+                    # If still no links, look for links with specific class "LinkEmis" or ID containing "btnPortalEmis"
+                    if not links:
+                        _LOGGER.debug("No links with token found, checking for links with class 'LinkEmis' or ID 'btnPortalEmis'")
+                        links = soup.find_all('a', class_="LinkEmis")
+                        if not links:
+                            links = soup.find_all('a', id=lambda id: id and 'btnPortalEmis' in id)
+                        if links:
+                            _LOGGER.debug(f"Found {len(links)} links with specific class or ID")
+
+                    # If still no links, look for iframe sources that might contain the target domain or specific URL
+                    if not links:
+                        _LOGGER.debug("No links with specific class or ID found, checking iframes")
+                        iframes = soup.find_all('iframe', src=lambda src: src and (BVK_TARGET_DOMAIN in src or target_url in src or 'token' in src.lower()))
+                        if iframes:
+                            _LOGGER.debug(f"Found {len(iframes)} iframes that might contain token")
+                            # Convert iframe src to links for consistent processing
+                            links = [{'href': iframe['src']} for iframe in iframes]
+
+                    if not links:
+                        # Log some of the page content for debugging
+                        _LOGGER.debug(f"Main info page HTML: {main_info_page[:500]}...")
+                        raise Exception("Link to SUEZ Smart Solutions not found")
+
+                    # Extract the link with authentication token
+                    target_link = links[0]['href']
+                    _LOGGER.debug(f"Found target link: {target_link}")
+
+                    # Try to extract the token from the link
+                    for pattern in token_patterns:
+                        match = re.search(pattern, target_link)
+                        if match:
+                            token_match = match
+                            _LOGGER.debug(f"Token found in link using pattern: {pattern}")
+                            break
+
+            if not token_match:
+                raise Exception("Authentication token not found in page")
 
             self.token = token_match.group(1)
 
