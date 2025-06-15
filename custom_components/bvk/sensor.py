@@ -74,7 +74,7 @@ class BVKCoordinator(DataUpdateCoordinator):
         # Register session cleanup
         self.async_on_remove(self._async_cleanup)
 
-    async def _async_update_data(self) -> dict[str, Any]:
+    async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from BVK website."""
         try:
             # Try to get cached token

@@ -6,7 +6,7 @@ from typing import Optional, Tuple, Dict, Any
 
 _LOGGER = logging.getLogger(__name__)
 
-def extract_login_form(html_content, logger=None) -> tuple[Optional[BeautifulSoup], Optional[BeautifulSoup], Optional[BeautifulSoup]]:
+def extract_login_form(html_content, logger=None) -> Tuple[Optional[BeautifulSoup], Optional[BeautifulSoup], Optional[BeautifulSoup]]:
     """Extract login form and its username/password fields from HTML content.
 
     Args:

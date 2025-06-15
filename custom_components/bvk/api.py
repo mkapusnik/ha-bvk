@@ -27,7 +27,7 @@ class BVKApiClient:
         self.session = None
         self.token = None
 
-    async def _fetch_consumption_data(self) -> dict[str, Any]:
+    async def _fetch_consumption_data(self) -> Dict[str, Any]:
         """Fetch consumption data from BVK website using the authentication token."""
         try:
             if not self.token:
@@ -136,7 +136,7 @@ class BVKApiClient:
             _LOGGER.error("Error fetching consumption data: %s", str(e))
             return {"value": None}
 
-    async def async_get_data(self) -> dict[str, Any]:
+    async def async_get_data(self) -> Dict[str, Any]:
         """Fetch data from BVK website."""
         try:
             # Create a new session if needed
