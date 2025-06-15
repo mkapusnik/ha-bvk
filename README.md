@@ -1,4 +1,11 @@
-# BVK Integration for Home Assistant
+# !!! Work in Progress !!! 
+
+This project is still in an early stage of development. It's unlikely it will work for you at this moment!
+Feel free to watch my progress and check again later
+
+# BVK Water Meter for Home Assistant
+
+This is a custom component for Home Assistant that provides integration with BVK smart meters.
 
 This integration allows you to monitor your water consumption from BVK (Brněnské vodárny a kanalizace) in Home Assistant.
 

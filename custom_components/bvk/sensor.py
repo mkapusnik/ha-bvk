@@ -45,6 +45,10 @@ async def async_setup_entry(
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
 
+    # Extract credentials from entry data
+    username = entry.data[CONF_USERNAME]
+    password = entry.data[CONF_PASSWORD]
+
     # Create update coordinator
     coordinator = BVKCoordinator(hass, username, password)
 
@@ -60,6 +64,8 @@ class BVKCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass: HomeAssistant, username: str, password: str) -> None:
         """Initialize coordinator."""
+        self._username = username
+        self._password = password
         super().__init__(
             hass,
             _LOGGER,
