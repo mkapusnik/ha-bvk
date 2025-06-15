@@ -34,12 +34,4 @@ python test_login_form.py
 python test_consumption.py
 ```
 
-### Running All Tests
-
-To run all tests at once:
-
-```
-python run_tests.py
-```
-
 Tests that require credentials will load them from the `.env` file. If credentials are not provided, those tests will be skipped.
