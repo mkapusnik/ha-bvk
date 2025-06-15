@@ -45,10 +45,6 @@ async def async_setup_entry(
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
 
-    # Extract credentials from entry data
-    username = entry.data[CONF_USERNAME]
-    password = entry.data[CONF_PASSWORD]
-
     # Create update coordinator
     coordinator = BVKCoordinator(hass, username, password)
 
@@ -64,8 +60,6 @@ class BVKCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass: HomeAssistant, username: str, password: str) -> None:
         """Initialize coordinator."""
-        self._username = username
-        self._password = password
         super().__init__(
             hass,
             _LOGGER,
@@ -75,12 +69,12 @@ class BVKCoordinator(DataUpdateCoordinator):
         self.username = username
         self.password = password
         self.api_client = BVKApiClient(username, password)
-        self.token_store = Store(hass, 1, f"{DOMAIN}_{TOKEN_CACHE_KEY}")
+        self.token_store = Store(hass, 1, DOMAIN + "_" + TOKEN_CACHE_KEY)
 
         # Register session cleanup
         self.async_on_remove(self._async_cleanup)
 
-    async def _async_update_data(self) -> dict[str, Any]:
+    async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from BVK website."""
         try:
             # Try to get cached token

@@ -21,10 +21,17 @@ Some tests require credentials to access the BVK API. To provide these credentia
 
 ## Running Tests
 
-To run the API test:
+All tests have been converted to use the Python unittest framework. You can run individual tests or all tests at once.
+
+### Running Individual Tests
+
+To run a specific test:
 
 ```
 python test_api.py
+python test_token_extraction.py
+python test_login_form.py
+python test_consumption.py
 ```
 
-This will load your credentials from the `.env` file and test the BVK API client.
+Tests that require credentials will load them from the `.env` file. If credentials are not provided, those tests will be skipped.

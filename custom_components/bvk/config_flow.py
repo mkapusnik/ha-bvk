@@ -64,7 +64,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
         )
 
-    def _validate_input(self, data: dict) -> None:
+    def _validate_input(self, data: dict[str, Any]) -> None:
         """Validate the user input allows us to connect."""
         # Validate the data can be used to set up a connection.
         # If it cannot, throw an exception.

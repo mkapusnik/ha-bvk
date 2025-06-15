@@ -3,6 +3,7 @@ import asyncio
 import logging
 import sys
 import os
+import unittest
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -51,34 +52,49 @@ _LOGGER = logging.getLogger(__name__)
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-async def test_api_client():
-    """Test the BVK API client.
 
-    Loads credentials from .env file. Create a .env file in the test directory
-    based on the .env.example template.
-    """
-    # Get credentials from environment variables
-    username = os.getenv("BVK_USERNAME")
-    password = os.getenv("BVK_PASSWORD")
+class TestConsumptionData(unittest.TestCase):
+    """Test the consumption data retrieval functionality."""
 
-    if not username or not password:
-        _LOGGER.error("Missing credentials. Please set BVK_USERNAME and BVK_PASSWORD in .env file")
-        return
+    async def async_test_consumption_data(self):
+        """Test the BVK API client for consumption data retrieval.
 
-    _LOGGER.info("Creating BVK API client")
-    api_client = BVKApiClient(username, password)
+        Loads credentials from .env file. Create a .env file in the test directory
+        based on the .env.example template.
+        """
+        # Get credentials from environment variables
+        username = os.getenv("BVK_USERNAME")
+        password = os.getenv("BVK_PASSWORD")
 
-    try:
-        _LOGGER.info("Getting data from BVK API")
-        data = await api_client.async_get_data()
-        _LOGGER.info(f"Received data: {data}")
-    except Exception as e:
-        _LOGGER.error(f"Error getting data: {e}")
-    finally:
-        _LOGGER.info("Closing API client session")
-        await api_client.async_close_session()
+        if not username or not password:
+            _LOGGER.error("Missing credentials. Please set BVK_USERNAME and BVK_PASSWORD in .env file")
+            self.skipTest("Missing credentials")
+            return
+
+        _LOGGER.info("Creating BVK API client")
+        api_client = BVKApiClient(username, password)
+
+        try:
+            _LOGGER.info("Getting data from BVK API")
+            data = await api_client.async_get_data()
+            _LOGGER.info(f"Received data: {data}")
+
+            # Add assertions
+            self.assertIsNotNone(data, "Data should not be None")
+            self.assertIn("value", data, "Data should contain 'value' key")
+        except Exception as e:
+            _LOGGER.error(f"Error getting data: {e}")
+            self.fail(f"Error getting data: {e}")
+        finally:
+            _LOGGER.info("Closing API client session")
+            await api_client.async_close_session()
+
+    def test_consumption_data(self):
+        """Run the async test for consumption data retrieval."""
+        _LOGGER.info("Starting BVK API client test for consumption data")
+        asyncio.run(self.async_test_consumption_data())
+        _LOGGER.info("BVK API client test for consumption data completed")
+
 
 if __name__ == "__main__":
-    _LOGGER.info("Starting BVK API client test")
-    asyncio.run(test_api_client())
-    _LOGGER.info("BVK API client test completed")
+    unittest.main()

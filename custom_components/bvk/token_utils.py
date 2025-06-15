@@ -15,7 +15,7 @@ def extract_login_form(html_content, logger=None) -> Tuple[Optional[BeautifulSou
                                           If None, uses the module logger.
 
     Returns:
-        Tuple[Optional[BeautifulSoup], Optional[BeautifulSoup], Optional[BeautifulSoup]]: 
+        tuple[Optional[BeautifulSoup], Optional[BeautifulSoup], Optional[BeautifulSoup]]: 
             A tuple containing (login_form, username_field, password_field)
 
     Raises:
@@ -40,7 +40,8 @@ def extract_login_form(html_content, logger=None) -> Tuple[Optional[BeautifulSou
             password_field = form.find('input', {'type': 'password'})
 
             if username_field and password_field:
-                log.debug(f"Found potential login form with fields: {username_field.get('name')} and {password_field.get('name')}")
+                log.debug("Found potential login form with fields: %s and %s", 
+                          username_field.get('name'), password_field.get('name'))
                 login_form = form
                 break
 
@@ -57,7 +58,7 @@ def extract_login_form(html_content, logger=None) -> Tuple[Optional[BeautifulSou
     return login_form, username_field, password_field
 
 
-def extract_token_from_html(html_content, logger=None):
+def extract_token_from_html(html_content, logger=None) -> str:
     """Extract authentication token from HTML content.
 
     Args:
@@ -89,7 +90,7 @@ def extract_token_from_html(html_content, logger=None):
         if matches:
             # Use the first match
             token_match = re.search(pattern, html_content)
-            log.debug(f"Token found directly in HTML using pattern: {pattern}")
+            log.debug("Token found directly in HTML using pattern: %s", pattern)
             break
 
     if not token_match:
@@ -98,7 +99,7 @@ def extract_token_from_html(html_content, logger=None):
 
         # Log all links on the page for debugging
         all_links = soup.find_all('a', href=lambda href: href and href.strip())
-        log.debug(f"Found {len(all_links)} links on the page")
+        log.debug("Found %d links on the page", len(all_links))
 
         # Look for links with token in href
         links_with_token = []
@@ -108,14 +109,14 @@ def extract_token_from_html(html_content, logger=None):
                 links_with_token.append(link)
 
         if links_with_token:
-            log.debug(f"Found {len(links_with_token)} links containing token patterns")
+            log.debug("Found %d links containing token patterns", len(links_with_token))
             # Extract the token from the first link
             link_href = links_with_token[0].get('href', '')
             for pattern in token_patterns:
                 match = re.search(pattern, link_href)
                 if match:
                     token_match = match
-                    log.debug(f"Token found in link using pattern: {pattern}")
+                    log.debug("Token found in link using pattern: %s", pattern)
                     break
 
         # If still no token found, try looking for specific elements
@@ -126,18 +127,18 @@ def extract_token_from_html(html_content, logger=None):
                 links = soup.find_all('a', id=lambda id: id and 'btnPortalEmis' in id)
 
             if links:
-                log.debug(f"Found {len(links)} links with specific class or ID")
+                log.debug("Found %d links with specific class or ID", len(links))
                 link_str = str(links[0])
                 for pattern in token_patterns:
                     match = re.search(pattern, link_str)
                     if match:
                         token_match = match
-                        log.debug(f"Token found in specific link using pattern: {pattern}")
+                        log.debug("Token found in specific link using pattern: %s", pattern)
                         break
 
     if not token_match:
         # Log some page content for debugging
-        log.debug(f"HTML snippet: {html_content[:500]}...")
+        log.debug("HTML snippet: %s...", html_content[:500])
         raise Exception("Authentication token not found in page")
 
     return token_match.group(1)
