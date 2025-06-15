@@ -12,7 +12,7 @@ from .const import (
     BVK_MAIN_INFO_URL,
     BVK_TARGET_DOMAIN,
 )
-from .token_utils import extract_token_from_html
+from .token_utils import extract_token_from_html, extract_login_form
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,45 +55,20 @@ class BVKApiClient:
 
             # Extract any necessary form fields or tokens for login
             login_page = await login_response.text()
+
+            # Use the utility function to extract the login form
+            login_form, username_field, password_field = extract_login_form(login_page, logger=_LOGGER)
+
+            # Parse the page to get additional form fields
             soup = BeautifulSoup(login_page, 'html.parser')
-
-            # Log the forms found on the page for debugging
-            forms = soup.find_all('form')
-            _LOGGER.debug(f"Found {len(forms)} forms on the login page")
-
-            # Try to find the login form - first try by ID, then by looking for forms with login fields
-            login_form = soup.find('form', {'id': 'form1'})
-
-            # If form1 not found, look for any form that has username and password fields
-            if not login_form:
-                _LOGGER.debug("Form with id 'form1' not found, looking for alternative login forms")
-                for form in forms:
-                    # Look for username and password fields in this form
-                    username_field = form.find('input', {'type': 'text'}) or form.find('input', {'type': 'email'})
-                    password_field = form.find('input', {'type': 'password'})
-
-                    if username_field and password_field:
-                        _LOGGER.debug(f"Found potential login form with fields: {username_field.get('name')} and {password_field.get('name')}")
-                        login_form = form
-                        break
-
-            if not login_form:
-                # Log the HTML content for debugging
-                _LOGGER.debug(f"Login page HTML: {login_page[:500]}...")  # Log first 500 chars to avoid huge logs
-                raise Exception("Login form not found")
 
             # Find the required form fields
             viewstate = soup.find('input', {'name': '__VIEWSTATE'})
             viewstategenerator = soup.find('input', {'name': '__VIEWSTATEGENERATOR'})
             eventvalidation = soup.find('input', {'name': '__EVENTVALIDATION'})
 
-            # Find username and password field names
-            username_field = login_form.find('input', {'type': 'text'}) or login_form.find('input', {'type': 'email'})
-            password_field = login_form.find('input', {'type': 'password'})
+            # Find submit button
             submit_button = login_form.find('input', {'type': 'submit'})
-
-            if not username_field or not password_field:
-                raise Exception("Username or password fields not found in the login form")
 
             # Log the field names for debugging
             _LOGGER.debug(f"Username field name: {username_field.get('name')}")

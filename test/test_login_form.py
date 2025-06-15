@@ -8,6 +8,9 @@ from bs4 import BeautifulSoup
 # Add the parent directory to the path in case we need to import from the custom component
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Import the utility function for login form extraction
+from custom_components.bvk.token_utils import extract_login_form
+
 # Set up logging
 logging.basicConfig(
     level=logging.DEBUG,
@@ -28,30 +31,8 @@ async def test_login_form_extraction():
         with open(LOGIN_PAGE_FILE, 'r', encoding='utf-8') as f:
             login_page = f.read()
 
-        # Parse the login page
-        soup = BeautifulSoup(login_page, 'html.parser')
-
-        # Find the login form
-        login_form = soup.find('form', {'id': 'form1'})
-        if not login_form:
-            _LOGGER.debug("Form with id 'form1' not found, looking for alternative login forms")
-            forms = soup.find_all('form')
-            for form in forms:
-                username_field = form.find('input', {'type': 'text'}) or form.find('input', {'type': 'email'})
-                password_field = form.find('input', {'type': 'password'})
-                if username_field and password_field:
-                    login_form = form
-                    break
-
-        if not login_form:
-            raise Exception("Login form not found")
-
-        # Find form fields
-        username_field = login_form.find('input', {'type': 'text'}) or login_form.find('input', {'type': 'email'})
-        password_field = login_form.find('input', {'type': 'password'})
-
-        if not username_field or not password_field:
-            raise Exception("Username or password fields not found in the login form")
+        # Use the utility function to extract the login form
+        login_form, username_field, password_field = extract_login_form(login_page, logger=_LOGGER)
 
         _LOGGER.info("Login form found successfully")
         _LOGGER.info(f"Username field name: {username_field.get('name')}")
