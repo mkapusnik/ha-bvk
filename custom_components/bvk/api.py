@@ -38,7 +38,7 @@ class BVKApiClient:
             consumption_url = f"{BVK_TARGET_DOMAIN}/eMIS.SE_BVK/Login.aspx?token={self.token}&langue=cs-CZ"
 
             # Fetch the page with consumption data
-            _LOGGER.debug(f"Fetching consumption data from: {consumption_url}")
+            _LOGGER.debug("Fetching consumption data from: %s", consumption_url)
             consumption_response = await self.session.get(consumption_url)
             consumption_page = await consumption_response.text()
 
@@ -52,7 +52,7 @@ class BVKApiClient:
             consumption_value = None
 
             # Log some information about the page structure
-            _LOGGER.debug(f"Page title: {soup.title.string if soup.title else 'No title'}")
+            _LOGGER.debug("Page title: %s", soup.title.string if soup.title else 'No title')
 
             # Try different approaches to find the consumption value
 
@@ -61,7 +61,7 @@ class BVKApiClient:
             keyword_pattern = '|'.join(keywords)
             consumption_elements = soup.find_all(string=re.compile(keyword_pattern, re.IGNORECASE))
 
-            _LOGGER.debug(f"Found {len(consumption_elements)} elements with keywords")
+            _LOGGER.debug("Found %d elements with keywords", len(consumption_elements))
 
             for element in consumption_elements:
                 # Check if the element or its parent contains a number
@@ -69,25 +69,25 @@ class BVKApiClient:
                 parent_text = element.parent.get_text() if hasattr(element, 'parent') and hasattr(element.parent, 'get_text') else ""
                 combined_text = element_text + " " + parent_text
 
-                _LOGGER.debug(f"Element text: {combined_text[:100]}")
+                _LOGGER.debug("Element text: %s", combined_text[:100])
 
                 # Look for numbers in the text
                 number_match = re.search(r'(\d+[.,]?\d*)\s*m3', combined_text)
                 if number_match:
                     consumption_value = float(number_match.group(1).replace(',', '.'))
-                    _LOGGER.debug(f"Found consumption value: {consumption_value} m3")
+                    _LOGGER.debug("Found consumption value: %f m3", consumption_value)
                     break
 
             # Approach 2: Look for tables that might contain consumption data
             if consumption_value is None:
                 tables = soup.find_all('table')
-                _LOGGER.debug(f"Found {len(tables)} tables")
+                _LOGGER.debug("Found %d tables", len(tables))
 
                 for table in tables:
                     # Look for table headers or cells containing keywords
                     headers = table.find_all(['th', 'td'], string=re.compile(keyword_pattern, re.IGNORECASE))
                     if headers:
-                        _LOGGER.debug(f"Found table with relevant headers: {[h.get_text() for h in headers]}")
+                        _LOGGER.debug("Found table with relevant headers: %s", [h.get_text() for h in headers])
 
                         # Look for cells with numbers
                         cells = table.find_all('td')
@@ -96,7 +96,7 @@ class BVKApiClient:
                             number_match = re.search(r'(\d+[.,]?\d*)\s*m3', cell_text)
                             if number_match:
                                 consumption_value = float(number_match.group(1).replace(',', '.'))
-                                _LOGGER.debug(f"Found consumption value in table: {consumption_value} m3")
+                                _LOGGER.debug("Found consumption value in table: %f m3", consumption_value)
                                 break
 
             # Approach 3: Look for specific div structures that might contain consumption data
@@ -105,14 +105,14 @@ class BVKApiClient:
                 divs = soup.find_all('div', {'class': re.compile('|'.join(['consumption', 'meter', 'water', 'spotřeba', 'měřidlo']), re.IGNORECASE)})
                 divs += soup.find_all('div', {'id': re.compile('|'.join(['consumption', 'meter', 'water', 'spotřeba', 'měřidlo']), re.IGNORECASE)})
 
-                _LOGGER.debug(f"Found {len(divs)} divs with relevant class/id")
+                _LOGGER.debug("Found %d divs with relevant class/id", len(divs))
 
                 for div in divs:
                     div_text = div.get_text()
                     number_match = re.search(r'(\d+[.,]?\d*)\s*m3', div_text)
                     if number_match:
                         consumption_value = float(number_match.group(1).replace(',', '.'))
-                        _LOGGER.debug(f"Found consumption value in div: {consumption_value} m3")
+                        _LOGGER.debug("Found consumption value in div: %f m3", consumption_value)
                         break
 
             # Approach 4: Look for any numbers followed by m3 in the entire page
@@ -121,10 +121,10 @@ class BVKApiClient:
                 all_matches = re.findall(r'(\d+[.,]?\d*)\s*m3', page_text)
 
                 if all_matches:
-                    _LOGGER.debug(f"Found {len(all_matches)} potential consumption values: {all_matches[:5]}")
+                    _LOGGER.debug("Found %d potential consumption values: %s", len(all_matches), all_matches[:5])
                     # Use the first match as a fallback
                     consumption_value = float(all_matches[0].replace(',', '.'))
-                    _LOGGER.debug(f"Using first match as consumption value: {consumption_value} m3")
+                    _LOGGER.debug("Using first match as consumption value: %f m3", consumption_value)
 
             if consumption_value is not None:
                 return {"value": consumption_value}
@@ -132,7 +132,7 @@ class BVKApiClient:
                 _LOGGER.warning("Could not find consumption value in the page")
                 return {"value": None}
 
-        except Exception as e:
+        except (aiohttp.ClientError, ValueError, AttributeError) as e:
             _LOGGER.error("Error fetching consumption data: %s", str(e))
             return {"value": None}
 
@@ -178,10 +178,10 @@ class BVKApiClient:
             submit_button = login_form.find('input', {'type': 'submit'})
 
             # Log the field names for debugging
-            _LOGGER.debug(f"Username field name: {username_field.get('name')}")
-            _LOGGER.debug(f"Password field name: {password_field.get('name')}")
+            _LOGGER.debug("Username field name: %s", username_field.get('name'))
+            _LOGGER.debug("Password field name: %s", password_field.get('name'))
             if submit_button:
-                _LOGGER.debug(f"Submit button name: {submit_button.get('name')}")
+                _LOGGER.debug("Submit button name: %s", submit_button.get('name'))
 
             # Prepare login data with dynamic field names
             login_data = {}
@@ -219,7 +219,7 @@ class BVKApiClient:
                     # Relative URL
                     login_submit_url = BVK_LOGIN_URL.rstrip('/') + '/' + form_action.lstrip('/')
 
-            _LOGGER.debug(f"Submitting login form to: {login_submit_url}")
+            _LOGGER.debug("Submitting login form to: %s", login_submit_url)
 
             # Submit login form
             login_post_response = await self.session.post(login_submit_url, data=login_data)
@@ -233,14 +233,14 @@ class BVKApiClient:
             # Check HTTP status
             if login_post_response.status != 200:
                 login_failed = True
-                _LOGGER.debug(f"Login failed: HTTP status {login_post_response.status}")
+                _LOGGER.debug("Login failed: HTTP status %d", login_post_response.status)
 
             # Check for error messages in various languages
             error_messages = ["Přihlášení se nezdařilo", "Login failed", "Nesprávné přihlašovací údaje"]
             for error_msg in error_messages:
                 if error_msg in login_response_text:
                     login_failed = True
-                    _LOGGER.debug(f"Login failed: Found error message '{error_msg}'")
+                    _LOGGER.debug("Login failed: Found error message '%s'", error_msg)
 
             # Check if we were redirected back to the login page
             if "login" in login_post_response.url.path.lower() and "password" in login_response_text.lower():
