@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Any
+from typing import Any, Dict, Optional
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -18,8 +18,16 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
+from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN, CONF_NAME, CONF_USERNAME, CONF_PASSWORD
+from .api import BVKApiClient
+from .const import (
+    DOMAIN,
+    CONF_NAME,
+    CONF_USERNAME,
+    CONF_PASSWORD,
+    TOKEN_CACHE_KEY,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +42,8 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensor platform."""
     name = entry.data[CONF_NAME]
+    username = entry.data[CONF_USERNAME]
+    password = entry.data[CONF_PASSWORD]
 
     # Extract credentials from entry data
     username = entry.data[CONF_USERNAME]
@@ -62,21 +72,41 @@ class BVKCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=SCAN_INTERVAL,
         )
+        self.username = username
+        self.password = password
+        self.api_client = BVKApiClient(username, password)
+        self.token_store = Store(hass, 1, f"{DOMAIN}_{TOKEN_CACHE_KEY}")
+
+        # Register session cleanup
+        self.async_on_remove(self._async_cleanup)
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch data from API."""
-        # TODO: Implement API call or data retrieval logic here
-        # Use self._username and self._password for authentication
-        # Example of how this might be implemented:
-        # async with aiohttp.ClientSession() as session:
-        #     auth_data = {"username": self._username, "password": self._password}
-        #     async with session.post("https://api.example.com/auth", json=auth_data) as resp:
-        #         token = await resp.json()
-        #         # Use token for subsequent API calls
+        """Fetch data from BVK website."""
+        try:
+            # Try to get cached token
+            stored_data = await self.token_store.async_load()
+            if stored_data and "token" in stored_data:
+                self.api_client.token = stored_data["token"]
+                _LOGGER.debug("Using cached token")
 
-        # This is a placeholder that returns a static value
-        _LOGGER.debug("Using credentials: %s / %s", self._username, self._password)
-        return {"value": 42}
+            # Get data from the API client
+            data = await self.api_client.async_get_data()
+
+            # If we got a new token during the data retrieval, cache it
+            if self.api_client.token and (not stored_data or stored_data.get("token") != self.api_client.token):
+                await self.token_store.async_save({"token": self.api_client.token})
+                _LOGGER.debug("Cached new authentication token")
+
+            return data
+
+        except Exception as e:
+            _LOGGER.error("Error updating BVK data: %s", str(e))
+            return {"value": None}
+
+    async def _async_cleanup(self) -> None:
+        """Close the API client session."""
+        await self.api_client.async_close_session()
+        _LOGGER.debug("Closed API client session")
 
 
 class BVKSensor(CoordinatorEntity, SensorEntity):

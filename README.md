@@ -7,42 +7,36 @@ Feel free to watch my progress and check again later
 
 This is a custom component for Home Assistant that provides integration with BVK smart meters.
 
-## Installation
+This integration allows you to monitor your water consumption from BVK (Brněnské vodárny a kanalizace) in Home Assistant.
 
-### Manual Installation
+### Sensor
 
-1. Copy the `bvk` folder from this repository to your Home Assistant's `custom_components` directory.
-2. Restart Home Assistant.
-3. Go to Configuration -> Integrations and click the "+" button to add a new integration.
-4. Search for "BVK" and follow the configuration steps.
+The `sensor.py` file contains the Home Assistant integration code that uses the API client to retrieve data and display it in Home Assistant.
 
-### HACS Installation
+## Authentication
 
-1. Make sure you have [HACS](https://hacs.xyz/) installed.
-2. Go to HACS -> Integrations -> Click the three dots in the top right -> Custom repositories.
-3. Add the URL of this repository and select "Integration" as the category.
-4. Click "Add".
-5. Search for "BVK" in HACS and install it.
-6. Restart Home Assistant.
-7. Go to Configuration -> Integrations and click the "+" button to add a new integration.
-8. Search for "BVK" and follow the configuration steps.
+The integration authenticates with BVK and then extracts an authentication token for Suez Smart Solutions. The token is extracted from a link on the BVK main info page, specifically looking for:
+```
+https://cz-sitr.suezsmartsolutions.com/eMIS.SE_BVK/Login.aspx
+```
+with a token parameter in the URL.
 
-## Configuration
+## Testing
 
-The integration can be configured through the Home Assistant UI:
+You can test the API client independently using the `test_api.py` script in the `test` directory:
 
-1. Go to Configuration -> Integrations.
-2. Click the "+" button to add a new integration.
-3. Search for "BVK" and select it.
-4. Enter a name for the integration.
-5. Click "Submit".
+```bash
+python test\test_api.py
+```
 
-## Features
+Make sure to update the username and password in the script before running it.
 
-For prototyping purposes:
-- Provides a basic temperature sensor with a static value (42°C)
-- Updates every 5 minutes
+Note: The API test requires the Home Assistant libraries to be available in your Python environment, as it imports from the custom component which depends on Home Assistant.
 
-## License
+For testing just the token extraction logic, you can use the `test_token_extraction.py` script:
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+```bash
+python test\test_token_extraction.py
+```
+
+This script focuses specifically on the login and token extraction process and does not require the Home Assistant libraries.

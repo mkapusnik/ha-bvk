@@ -1,1 +1,4 @@
 homeassistant
+requests
+beautifulsoup4
+python-dotenv
