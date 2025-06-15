@@ -3,10 +3,6 @@ import asyncio
 import logging
 import sys
 import os
-import aiohttp
-from bs4 import BeautifulSoup
-import re
-from test_login_form import test_login_form_extraction
 
 # Add the parent directory to the path in case we need to import from the custom component
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -33,7 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 LOGIN_PAGE_FILE = os.path.join(os.path.dirname(__file__), "resources", "login_page.html")
 MAIN_INFO_PAGE_FILE = os.path.join(os.path.dirname(__file__), "resources", "main_info_page.html")
 
-async def extract_token():
+async def extract_token() -> str:
     """Extract authentication token from BVK website."""
     try:
         _LOGGER.info("Loading main info page from local file")
@@ -47,21 +43,29 @@ async def extract_token():
         token = extract_token_from_html(main_info_page, logger=_LOGGER)
         return token
 
+    except FileNotFoundError as e:
+        _LOGGER.error("Error reading file: %s", e)
+        raise
+    except ValueError as e:
+        _LOGGER.error("Error parsing token: %s", e)
+        raise
     except Exception as e:
-        _LOGGER.error(f"Error during token extraction: {e}")
+        _LOGGER.error("Unexpected error during token extraction: %s", e)
         raise
 
 
-async def main():
+async def main() -> None:
     """Run the token extraction test."""
     _LOGGER.info("Starting tests")
 
     # Run the token extraction test
     try:
         token = await extract_token()
-        _LOGGER.info(f"Token extraction successful: {token}...")
+        _LOGGER.info("Token extraction successful: %s...", token)
+    except (FileNotFoundError, ValueError) as e:
+        _LOGGER.error("Token extraction failed: %s", e)
     except Exception as e:
-        _LOGGER.error(f"Token extraction failed: {e}")
+        _LOGGER.error("Unexpected error during token extraction: %s", e)
 
     _LOGGER.info("Tests completed")
 

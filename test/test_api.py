@@ -1,7 +1,7 @@
 """Test script for BVK API client."""
 import asyncio
+import aiohttp
 import logging
-import sys
 import os
 import sys
 from pathlib import Path
@@ -24,7 +24,7 @@ logging.basicConfig(
 _LOGGER = logging.getLogger(__name__)
 
 
-async def test_api_client():
+async def test_api_client() -> None:
     """Test the BVK API client.
 
     Loads credentials from .env file. Create a .env file in the test directory
@@ -44,9 +44,11 @@ async def test_api_client():
     try:
         _LOGGER.info("Getting data from BVK API")
         data = await api_client.async_get_data()
-        _LOGGER.info(f"Received data: {data}")
+        _LOGGER.info("Received data: %s", data)
+    except (aiohttp.ClientError, ValueError) as e:
+        _LOGGER.error("Error getting data: %s", e)
     except Exception as e:
-        _LOGGER.error(f"Error getting data: {e}")
+        _LOGGER.error("Unexpected error getting data: %s", e)
     finally:
         _LOGGER.info("Closing API client session")
         await api_client.async_close_session()

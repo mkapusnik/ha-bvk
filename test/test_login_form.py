@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 # Path to locally saved login page for testing
 LOGIN_PAGE_FILE = os.path.join(os.path.dirname(__file__), "resources", "login_page.html")
 
-async def test_login_form_extraction():
+async def test_login_form_extraction() -> bool:
     """Test the login form extraction from the local file."""
     _LOGGER.info("Starting login form extraction test")
 
@@ -43,7 +43,7 @@ async def test_login_form_extraction():
         _LOGGER.error(f"Login form extraction test failed: {e}")
         return False
 
-async def main():
+async def main() -> None:
     """Run the login form extraction test."""
     _LOGGER.info("Starting login form extraction test")
 
