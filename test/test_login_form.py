@@ -3,6 +3,7 @@ import asyncio
 import logging
 import sys
 import os
+import unittest
 from bs4 import BeautifulSoup
 
 # Add the parent directory to the path in case we need to import from the custom component
@@ -22,11 +23,14 @@ _LOGGER = logging.getLogger(__name__)
 # Path to locally saved login page for testing
 LOGIN_PAGE_FILE = os.path.join(os.path.dirname(__file__), "resources", "login_page.html")
 
-async def test_login_form_extraction() -> bool:
-    """Test the login form extraction from the local file."""
-    _LOGGER.info("Starting login form extraction test")
 
-    try:
+class TestLoginFormExtraction(unittest.TestCase):
+    """Test the login form extraction functionality."""
+
+    async def async_test_login_form_extraction(self) -> None:
+        """Test the login form extraction from the local file."""
+        _LOGGER.info("Starting login form extraction test")
+
         # Load the login page from the local file
         with open(LOGIN_PAGE_FILE, 'r', encoding='utf-8') as f:
             login_page = f.read()
@@ -38,20 +42,26 @@ async def test_login_form_extraction() -> bool:
         _LOGGER.info(f"Username field name: {username_field.get('name')}")
         _LOGGER.info(f"Password field name: {password_field.get('name')}")
 
-        return True
-    except Exception as e:
-        _LOGGER.error(f"Login form extraction test failed: {e}")
-        return False
+        # Add assertions
+        self.assertIsNotNone(login_form, "Login form should not be None")
+        self.assertIsNotNone(username_field, "Username field should not be None")
+        self.assertIsNotNone(password_field, "Password field should not be None")
+        self.assertTrue(username_field.has_attr('name'), "Username field should have a name attribute")
+        self.assertTrue(password_field.has_attr('name'), "Password field should have a name attribute")
 
-async def main() -> None:
-    """Run the login form extraction test."""
-    _LOGGER.info("Starting login form extraction test")
+    def test_login_form_extraction(self):
+        """Run the async test for login form extraction."""
+        _LOGGER.info("Starting login form extraction test")
 
-    # Test login form extraction from local file
-    form_extraction_result = await test_login_form_extraction()
-    _LOGGER.info(f"Login form extraction test {'passed' if form_extraction_result else 'failed'}")
+        try:
+            asyncio.run(self.async_test_login_form_extraction())
+            _LOGGER.info("Login form extraction test passed")
+        except Exception as e:
+            _LOGGER.error(f"Login form extraction test failed: {e}")
+            self.fail(f"Login form extraction test failed: {e}")
 
-    _LOGGER.info("Test completed")
+        _LOGGER.info("Test completed")
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    unittest.main()
