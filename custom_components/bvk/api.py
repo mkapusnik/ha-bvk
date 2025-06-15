@@ -27,6 +27,115 @@ class BVKApiClient:
         self.session = None
         self.token = None
 
+    async def _fetch_consumption_data(self) -> dict[str, Any]:
+        """Fetch consumption data from BVK website using the authentication token."""
+        try:
+            if not self.token:
+                _LOGGER.error("No token available to fetch consumption data")
+                return {"value": None}
+
+            # Construct the URL with the token
+            consumption_url = f"{BVK_TARGET_DOMAIN}/eMIS.SE_BVK/Login.aspx?token={self.token}&langue=cs-CZ"
+
+            # Fetch the page with consumption data
+            _LOGGER.debug(f"Fetching consumption data from: {consumption_url}")
+            consumption_response = await self.session.get(consumption_url)
+            consumption_page = await consumption_response.text()
+
+            # Parse the page to find consumption data
+            _LOGGER.debug("Parsing consumption data page")
+            soup = BeautifulSoup(consumption_page, 'html.parser')
+
+            # Look for consumption data in the page
+            # This is a generic approach since we don't have a sample of the actual page
+            # We'll look for elements that might contain consumption data
+            consumption_value = None
+
+            # Log some information about the page structure
+            _LOGGER.debug(f"Page title: {soup.title.string if soup.title else 'No title'}")
+
+            # Try different approaches to find the consumption value
+
+            # Approach 1: Look for elements with text containing keywords
+            keywords = ['spotřeba', 'm3', 'vody', 'consumption', 'water', 'odběr', 'stav', 'měřidlo', 'meter']
+            keyword_pattern = '|'.join(keywords)
+            consumption_elements = soup.find_all(string=re.compile(keyword_pattern, re.IGNORECASE))
+
+            _LOGGER.debug(f"Found {len(consumption_elements)} elements with keywords")
+
+            for element in consumption_elements:
+                # Check if the element or its parent contains a number
+                element_text = element.get_text() if hasattr(element, 'get_text') else str(element)
+                parent_text = element.parent.get_text() if hasattr(element, 'parent') and hasattr(element.parent, 'get_text') else ""
+                combined_text = element_text + " " + parent_text
+
+                _LOGGER.debug(f"Element text: {combined_text[:100]}")
+
+                # Look for numbers in the text
+                number_match = re.search(r'(\d+[.,]?\d*)\s*m3', combined_text)
+                if number_match:
+                    consumption_value = float(number_match.group(1).replace(',', '.'))
+                    _LOGGER.debug(f"Found consumption value: {consumption_value} m3")
+                    break
+
+            # Approach 2: Look for tables that might contain consumption data
+            if consumption_value is None:
+                tables = soup.find_all('table')
+                _LOGGER.debug(f"Found {len(tables)} tables")
+
+                for table in tables:
+                    # Look for table headers or cells containing keywords
+                    headers = table.find_all(['th', 'td'], string=re.compile(keyword_pattern, re.IGNORECASE))
+                    if headers:
+                        _LOGGER.debug(f"Found table with relevant headers: {[h.get_text() for h in headers]}")
+
+                        # Look for cells with numbers
+                        cells = table.find_all('td')
+                        for cell in cells:
+                            cell_text = cell.get_text()
+                            number_match = re.search(r'(\d+[.,]?\d*)\s*m3', cell_text)
+                            if number_match:
+                                consumption_value = float(number_match.group(1).replace(',', '.'))
+                                _LOGGER.debug(f"Found consumption value in table: {consumption_value} m3")
+                                break
+
+            # Approach 3: Look for specific div structures that might contain consumption data
+            if consumption_value is None:
+                # Look for divs with class or id containing keywords
+                divs = soup.find_all('div', {'class': re.compile('|'.join(['consumption', 'meter', 'water', 'spotřeba', 'měřidlo']), re.IGNORECASE)})
+                divs += soup.find_all('div', {'id': re.compile('|'.join(['consumption', 'meter', 'water', 'spotřeba', 'měřidlo']), re.IGNORECASE)})
+
+                _LOGGER.debug(f"Found {len(divs)} divs with relevant class/id")
+
+                for div in divs:
+                    div_text = div.get_text()
+                    number_match = re.search(r'(\d+[.,]?\d*)\s*m3', div_text)
+                    if number_match:
+                        consumption_value = float(number_match.group(1).replace(',', '.'))
+                        _LOGGER.debug(f"Found consumption value in div: {consumption_value} m3")
+                        break
+
+            # Approach 4: Look for any numbers followed by m3 in the entire page
+            if consumption_value is None:
+                page_text = soup.get_text()
+                all_matches = re.findall(r'(\d+[.,]?\d*)\s*m3', page_text)
+
+                if all_matches:
+                    _LOGGER.debug(f"Found {len(all_matches)} potential consumption values: {all_matches[:5]}")
+                    # Use the first match as a fallback
+                    consumption_value = float(all_matches[0].replace(',', '.'))
+                    _LOGGER.debug(f"Using first match as consumption value: {consumption_value} m3")
+
+            if consumption_value is not None:
+                return {"value": consumption_value}
+            else:
+                _LOGGER.warning("Could not find consumption value in the page")
+                return {"value": None}
+
+        except Exception as e:
+            _LOGGER.error("Error fetching consumption data: %s", str(e))
+            return {"value": None}
+
     async def async_get_data(self) -> dict[str, Any]:
         """Fetch data from BVK website."""
         try:
@@ -39,107 +148,7 @@ class BVKApiClient:
                 await self._login_and_get_token()
 
             # Use the token to get water consumption data
-            if self.token:
-                # Construct the URL with the token
-                consumption_url = f"{BVK_TARGET_DOMAIN}/eMIS.SE_BVK/Login.aspx?token={self.token}&langue=cs-CZ"
-
-                # Fetch the page with consumption data
-                _LOGGER.debug(f"Fetching consumption data from: {consumption_url}")
-                consumption_response = await self.session.get(consumption_url)
-                consumption_page = await consumption_response.text()
-
-                # Parse the page to find consumption data
-                _LOGGER.debug("Parsing consumption data page")
-                soup = BeautifulSoup(consumption_page, 'html.parser')
-
-                # Look for consumption data in the page
-                # This is a generic approach since we don't have a sample of the actual page
-                # We'll look for elements that might contain consumption data
-                consumption_value = None
-
-                # Log some information about the page structure
-                _LOGGER.debug(f"Page title: {soup.title.string if soup.title else 'No title'}")
-
-                # Try different approaches to find the consumption value
-
-                # Approach 1: Look for elements with text containing keywords
-                keywords = ['spotřeba', 'm3', 'vody', 'consumption', 'water', 'odběr', 'stav', 'měřidlo', 'meter']
-                keyword_pattern = '|'.join(keywords)
-                consumption_elements = soup.find_all(string=re.compile(keyword_pattern, re.IGNORECASE))
-
-                _LOGGER.debug(f"Found {len(consumption_elements)} elements with keywords")
-
-                for element in consumption_elements:
-                    # Check if the element or its parent contains a number
-                    element_text = element.get_text() if hasattr(element, 'get_text') else str(element)
-                    parent_text = element.parent.get_text() if hasattr(element, 'parent') and hasattr(element.parent, 'get_text') else ""
-                    combined_text = element_text + " " + parent_text
-
-                    _LOGGER.debug(f"Element text: {combined_text[:100]}")
-
-                    # Look for numbers in the text
-                    number_match = re.search(r'(\d+[.,]?\d*)\s*m3', combined_text)
-                    if number_match:
-                        consumption_value = float(number_match.group(1).replace(',', '.'))
-                        _LOGGER.debug(f"Found consumption value: {consumption_value} m3")
-                        break
-
-                # Approach 2: Look for tables that might contain consumption data
-                if consumption_value is None:
-                    tables = soup.find_all('table')
-                    _LOGGER.debug(f"Found {len(tables)} tables")
-
-                    for table in tables:
-                        # Look for table headers or cells containing keywords
-                        headers = table.find_all(['th', 'td'], string=re.compile(keyword_pattern, re.IGNORECASE))
-                        if headers:
-                            _LOGGER.debug(f"Found table with relevant headers: {[h.get_text() for h in headers]}")
-
-                            # Look for cells with numbers
-                            cells = table.find_all('td')
-                            for cell in cells:
-                                cell_text = cell.get_text()
-                                number_match = re.search(r'(\d+[.,]?\d*)\s*m3', cell_text)
-                                if number_match:
-                                    consumption_value = float(number_match.group(1).replace(',', '.'))
-                                    _LOGGER.debug(f"Found consumption value in table: {consumption_value} m3")
-                                    break
-
-                # Approach 3: Look for specific div structures that might contain consumption data
-                if consumption_value is None:
-                    # Look for divs with class or id containing keywords
-                    divs = soup.find_all('div', {'class': re.compile('|'.join(['consumption', 'meter', 'water', 'spotřeba', 'měřidlo']), re.IGNORECASE)})
-                    divs += soup.find_all('div', {'id': re.compile('|'.join(['consumption', 'meter', 'water', 'spotřeba', 'měřidlo']), re.IGNORECASE)})
-
-                    _LOGGER.debug(f"Found {len(divs)} divs with relevant class/id")
-
-                    for div in divs:
-                        div_text = div.get_text()
-                        number_match = re.search(r'(\d+[.,]?\d*)\s*m3', div_text)
-                        if number_match:
-                            consumption_value = float(number_match.group(1).replace(',', '.'))
-                            _LOGGER.debug(f"Found consumption value in div: {consumption_value} m3")
-                            break
-
-                # Approach 4: Look for any numbers followed by m3 in the entire page
-                if consumption_value is None:
-                    page_text = soup.get_text()
-                    all_matches = re.findall(r'(\d+[.,]?\d*)\s*m3', page_text)
-
-                    if all_matches:
-                        _LOGGER.debug(f"Found {len(all_matches)} potential consumption values: {all_matches[:5]}")
-                        # Use the first match as a fallback
-                        consumption_value = float(all_matches[0].replace(',', '.'))
-                        _LOGGER.debug(f"Using first match as consumption value: {consumption_value} m3")
-
-                if consumption_value is not None:
-                    return {"value": consumption_value}
-                else:
-                    _LOGGER.warning("Could not find consumption value in the page")
-                    return {"value": None}
-            else:
-                _LOGGER.error("No token available to fetch consumption data")
-                return {"value": None}
+            return await self._fetch_consumption_data()
 
         except Exception as e:
             _LOGGER.error("Error updating BVK data: %s", str(e))
