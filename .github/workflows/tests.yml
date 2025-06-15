@@ -13,12 +13,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-#    - name: HACS validation
-#      uses: "hacs/action@main"
-#      with:
-#        category: "integration"
+    - name: HACS validation
+      uses: "hacs/action@main"
+      with:
+        category: "integration"
 
-    - uses: home-assistant/actions/hassfest@master
+#    - uses: home-assistant/actions/hassfest@master
 
     - name: Set up Python
       uses: actions/setup-python@v4
