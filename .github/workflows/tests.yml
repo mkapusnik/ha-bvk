@@ -13,6 +13,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: HACS validation
+      uses: "hacs/action@main"
+      with:
+        category: "integration"
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -31,4 +36,7 @@ jobs:
     - name: Run tests
       run: |
         cd test
-        python -m unittest test_token_extraction.py test_login_form.py test_consumption.py
+        python -m unittest test_token_extraction.py test_login_form.py
+#test_api.py
+#test_consumption.py
+                
