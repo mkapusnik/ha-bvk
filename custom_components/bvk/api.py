@@ -195,9 +195,18 @@ class BVKApiClient:
                 _LOGGER.debug("No direct links to SUEZ Smart Solutions found, looking for alternative links with token")
                 links = soup.find_all('a', href=lambda href: href and ('token' in href.lower() or 'auth' in href.lower()))
 
+            # If still no links, look for links with specific class "LinkEmis" or ID containing "btnPortalEmis"
+            if not links:
+                _LOGGER.debug("No links with token found, checking for links with class 'LinkEmis' or ID 'btnPortalEmis'")
+                links = soup.find_all('a', class_="LinkEmis")
+                if not links:
+                    links = soup.find_all('a', id=lambda id: id and 'btnPortalEmis' in id)
+                if links:
+                    _LOGGER.debug(f"Found {len(links)} links with specific class or ID")
+
             # If still no links, look for iframe sources that might contain the target domain or specific URL
             if not links:
-                _LOGGER.debug("No links with token found, checking iframes")
+                _LOGGER.debug("No links with specific class or ID found, checking iframes")
                 iframes = soup.find_all('iframe', src=lambda src: src and (BVK_TARGET_DOMAIN in src or target_url in src or 'token' in src.lower()))
                 if iframes:
                     _LOGGER.debug(f"Found {len(iframes)} iframes that might contain token")
