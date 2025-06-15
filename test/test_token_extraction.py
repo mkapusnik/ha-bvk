@@ -23,8 +23,9 @@ _LOGGER = logging.getLogger(__name__)
 BVK_LOGIN_URL = "https://zis.bvk.cz/"
 BVK_MAIN_INFO_URL = "https://zis.bvk.cz/Userdata/MainInfo.aspx"
 BVK_TARGET_DOMAIN = "https://cz-sitr.suezsmartsolutions.com"
-# Path to locally saved login page for testing
+# Paths to locally saved pages for testing
 LOGIN_PAGE_FILE = os.path.join(os.path.dirname(__file__), "resources", "login_page.html")
+MAIN_INFO_PAGE_FILE = os.path.join(os.path.dirname(__file__), "resources", "main_info_page.html")
 
 async def extract_token(username, password):
     """Extract authentication token from BVK website."""
@@ -107,70 +108,79 @@ async def extract_token(username, password):
             if login_post_response.status != 200:
                 raise Exception(f"Login failed: HTTP status {login_post_response.status}")
 
-            # Step 2: Load the main info page
-            _LOGGER.info("Loading main info page")
-            main_info_response = await session.get(BVK_MAIN_INFO_URL)
-            main_info_page = await main_info_response.text()
+            # Step 2: Load the main info page from local file
+            _LOGGER.info("Loading main info page from local file")
 
-            # Step 3: Find the link to SUEZ Smart Solutions
-            soup = BeautifulSoup(main_info_page, 'html.parser')
+            # Read the main info page from the local file
+            with open(MAIN_INFO_PAGE_FILE, 'r', encoding='utf-8') as f:
+                main_info_page = f.read()
 
-            # Log all links for debugging
-            all_links = soup.find_all('a', href=lambda href: href and href.strip())
-            _LOGGER.info(f"Found {len(all_links)} links on the main info page")
+            # Step 3: Find the token directly in the HTML
+            _LOGGER.info("Searching for token directly in the HTML")
 
-            # First, look specifically for the target URL with Login.aspx
-            target_url = "https://cz-sitr.suezsmartsolutions.com/eMIS.SE_BVK/Login.aspx"
-            links = soup.find_all('a', href=lambda href: href and target_url in href)
-
-            if links:
-                _LOGGER.info(f"Found specific target URL: {target_url}")
-
-            # If specific URL not found, look for links containing the target domain
-            if not links:
-                _LOGGER.info("Specific target URL not found, looking for any links with target domain")
-                links = soup.find_all('a', href=lambda href: href and BVK_TARGET_DOMAIN in href)
-
-            # If no direct links to target domain, look for any links that might contain 'token'
-            if not links:
-                _LOGGER.info("No direct links to SUEZ Smart Solutions found, looking for alternative links with token")
-                links = soup.find_all('a', href=lambda href: href and ('token' in href.lower() or 'auth' in href.lower()))
-
-            # If still no links, look for iframe sources
-            if not links:
-                _LOGGER.info("No links with token found, checking iframes")
-                iframes = soup.find_all('iframe', src=lambda src: src and (BVK_TARGET_DOMAIN in src or target_url in src or 'token' in src.lower()))
-                if iframes:
-                    _LOGGER.info(f"Found {len(iframes)} iframes that might contain token")
-                    links = [{'href': iframe['src']} for iframe in iframes]
-
-            if not links:
-                # Log some page content for debugging
-                _LOGGER.debug(f"Main info page HTML snippet: {main_info_page[:500]}...")
-                raise Exception("Link to SUEZ Smart Solutions not found")
-
-            # Extract the link with authentication token
-            target_link = links[0]['href']
-            _LOGGER.info(f"Found target link: {target_link}")
-
-            # Try different patterns to extract the token
+            # Define patterns to search for in the HTML
             token_patterns = [
-                r'token=([^&]+)',  # Standard token format
-                r'auth=([^&]+)',   # Alternative auth parameter
-                r'jwt=([^&]+)',    # JWT token format
-                r'access_token=([^&]+)'  # OAuth style token
+                r'token=([^&"\']+)',  # Standard token format
+                r'auth=([^&"\']+)',   # Alternative auth parameter
+                r'jwt=([^&"\']+)',    # JWT token format
+                r'access_token=([^&"\']+)'  # OAuth style token
             ]
 
+            # Search for the token in the entire HTML
             token_match = None
             for pattern in token_patterns:
-                match = re.search(pattern, target_link)
-                if match:
-                    token_match = match
+                matches = re.findall(pattern, main_info_page)
+                if matches:
+                    # Use the first match
+                    token_match = re.search(pattern, main_info_page)
                     _LOGGER.info(f"Token found using pattern: {pattern}")
                     break
 
             if not token_match:
-                raise Exception("Authentication token not found in link")
+                # Try to find the specific link with class "LinkEmis" or ID containing "btnPortalEmis"
+                soup = BeautifulSoup(main_info_page, 'html.parser')
+
+                # Log all links for debugging
+                all_links = soup.find_all('a', href=lambda href: href and href.strip())
+                _LOGGER.info(f"Found {len(all_links)} links on the main info page")
+
+                # Look for specific links that might contain the token
+                links_with_token = []
+                for link in all_links:
+                    link_str = str(link)
+                    if 'token=' in link_str:
+                        links_with_token.append(link_str)
+
+                if links_with_token:
+                    _LOGGER.info(f"Found {len(links_with_token)} links containing 'token='")
+                    # Extract the token from the first link
+                    for pattern in token_patterns:
+                        match = re.search(pattern, links_with_token[0])
+                        if match:
+                            token_match = match
+                            _LOGGER.info(f"Token found in link using pattern: {pattern}")
+                            break
+
+                if not token_match:
+                    # If still no token found, look for specific elements
+                    links = soup.find_all('a', class_="LinkEmis")
+                    if not links:
+                        links = soup.find_all('a', id=lambda id: id and 'btnPortalEmis' in id)
+
+                    if links:
+                        _LOGGER.info(f"Found specific link, checking its HTML")
+                        link_str = str(links[0])
+                        for pattern in token_patterns:
+                            match = re.search(pattern, link_str)
+                            if match:
+                                token_match = match
+                                _LOGGER.info(f"Token found in specific link using pattern: {pattern}")
+                                break
+
+            if not token_match:
+                # Log some page content for debugging
+                _LOGGER.debug(f"Main info page HTML snippet: {main_info_page[:500]}...")
+                raise Exception("Authentication token not found in page")
 
             token = token_match.group(1)
             _LOGGER.info(f"Successfully extracted token: {token[:5]}...")
@@ -184,9 +194,29 @@ async def extract_token(username, password):
 
 async def main():
     """Run the token extraction test."""
-    # Replace with your actual credentials
-    username = "your_username"
-    password = "your_password"
+    # Load credentials from .env file
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    username = None
+    password = None
+
+    # Read .env file manually
+    try:
+        with open(env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    key, value = line.split('=', 1)
+                    if key == "BVK_USERNAME":
+                        username = value
+                    elif key == "BVK_PASSWORD":
+                        password = value
+    except Exception as e:
+        _LOGGER.error(f"Error reading .env file: {e}")
+        username = "your_username"
+        password = "your_password"
+
+    if not username or not password or username == "your_username":
+        _LOGGER.warning("Using default credentials. For real testing, update .env file.")
 
     _LOGGER.info("Starting tests")
 
@@ -194,14 +224,12 @@ async def main():
     form_extraction_result = await test_login_form_extraction()
     _LOGGER.info(f"Login form extraction test {'passed' if form_extraction_result else 'failed'}")
 
-    # Only run the full token extraction if requested
-    run_full_test = False
-    if run_full_test:
-        try:
-            token = await extract_token(username, password)
-            _LOGGER.info("Token extraction successful")
-        except Exception as e:
-            _LOGGER.error(f"Token extraction failed: {e}")
+    # Run the token extraction test
+    try:
+        token = await extract_token(username, password)
+        _LOGGER.info(f"Token extraction successful: {token[:10]}...")
+    except Exception as e:
+        _LOGGER.error(f"Token extraction failed: {e}")
 
     _LOGGER.info("Tests completed")
 
