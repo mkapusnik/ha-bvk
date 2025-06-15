@@ -1,22 +1,149 @@
-"""API client for BVK."""
-from __future__ import annotations
-
+"""Simple test script for BVK API client."""
+import asyncio
 import logging
-import aiohttp
+import sys
+import os
 import re
-from typing import Any, Dict, Optional
+import aiohttp
 from bs4 import BeautifulSoup
+from pathlib import Path
+from dotenv import load_dotenv
+from typing import Optional, Tuple, Dict, Any
 
-from .const import (
-    BVK_LOGIN_URL,
-    BVK_MAIN_INFO_URL,
-    BVK_TARGET_DOMAIN,
+# Import the constants directly using importlib to avoid triggering __init__.py
+import importlib.util
+spec = importlib.util.spec_from_file_location(
+    "const", 
+    os.path.join(os.path.dirname(__file__), '..', 'custom_components', 'bvk', 'const.py')
 )
-from .token_utils import extract_token_from_html, extract_login_form
+const = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(const)
 
+# Use the imported constants
+BVK_LOGIN_URL = const.BVK_LOGIN_URL
+BVK_MAIN_INFO_URL = const.BVK_MAIN_INFO_URL
+BVK_TARGET_DOMAIN = const.BVK_TARGET_DOMAIN
+
+# Set up logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 _LOGGER = logging.getLogger(__name__)
 
+# Define utility functions
+def extract_login_form(html_content, logger=None) -> Tuple[Optional[BeautifulSoup], Optional[BeautifulSoup], Optional[BeautifulSoup]]:
+    """Extract login form and its username/password fields from HTML content."""
+    # Use provided logger or fallback to module logger
+    log = logger or _LOGGER
 
+    # Parse the HTML
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # Find the login form - first try by ID, then by looking for forms with login fields
+    login_form = soup.find('form', {'id': 'form1'})
+
+    # If form1 not found, look for any form that has username and password fields
+    if not login_form:
+        log.debug("Form with id 'form1' not found, looking for alternative login forms")
+        forms = soup.find_all('form')
+        for form in forms:
+            # Look for username and password fields in this form
+            username_field = form.find('input', {'type': 'text'}) or form.find('input', {'type': 'email'})
+            password_field = form.find('input', {'type': 'password'})
+
+            if username_field and password_field:
+                log.debug(f"Found potential login form with fields: {username_field.get('name')} and {password_field.get('name')}")
+                login_form = form
+                break
+
+    if not login_form:
+        raise Exception("Login form not found")
+
+    # Find username and password field names
+    username_field = login_form.find('input', {'type': 'text'}) or login_form.find('input', {'type': 'email'})
+    password_field = login_form.find('input', {'type': 'password'})
+
+    if not username_field or not password_field:
+        raise Exception("Username or password fields not found in the login form")
+
+    return login_form, username_field, password_field
+
+def extract_token_from_html(html_content, logger=None):
+    """Extract authentication token from HTML content."""
+    # Use provided logger or fallback to module logger
+    log = logger or _LOGGER
+
+    # Define patterns to search for in the HTML
+    token_patterns = [
+        r'token=([^&"\']+)',  # Standard token format
+        r'auth=([^&"\']+)',   # Alternative auth parameter
+        r'jwt=([^&"\']+)',    # JWT token format
+        r'access_token=([^&"\']+)'  # OAuth style token
+    ]
+
+    # Search for the token in the entire HTML first
+    token_match = None
+    for pattern in token_patterns:
+        matches = re.findall(pattern, html_content)
+        if matches:
+            # Use the first match
+            token_match = re.search(pattern, html_content)
+            log.debug(f"Token found directly in HTML using pattern: {pattern}")
+            break
+
+    if not token_match:
+        log.debug("Token not found directly in HTML, trying to find it in specific elements")
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Log all links on the page for debugging
+        all_links = soup.find_all('a', href=lambda href: href and href.strip())
+        log.debug(f"Found {len(all_links)} links on the page")
+
+        # Look for links with token in href
+        links_with_token = []
+        for link in all_links:
+            link_href = link.get('href', '')
+            if any(re.search(pattern, link_href) for pattern in token_patterns):
+                links_with_token.append(link)
+
+        if links_with_token:
+            log.debug(f"Found {len(links_with_token)} links containing token patterns")
+            # Extract the token from the first link
+            link_href = links_with_token[0].get('href', '')
+            for pattern in token_patterns:
+                match = re.search(pattern, link_href)
+                if match:
+                    token_match = match
+                    log.debug(f"Token found in link using pattern: {pattern}")
+                    break
+
+        # If still no token found, try looking for specific elements
+        if not token_match:
+            # Look for links with specific class "LinkEmis" or ID containing "btnPortalEmis"
+            links = soup.find_all('a', class_="LinkEmis")
+            if not links:
+                links = soup.find_all('a', id=lambda id: id and 'btnPortalEmis' in id)
+
+            if links:
+                log.debug(f"Found {len(links)} links with specific class or ID")
+                link_str = str(links[0])
+                for pattern in token_patterns:
+                    match = re.search(pattern, link_str)
+                    if match:
+                        token_match = match
+                        log.debug(f"Token found in specific link using pattern: {pattern}")
+                        break
+
+    if not token_match:
+        # Log some page content for debugging
+        log.debug(f"HTML snippet: {html_content[:500]}...")
+        raise Exception("Authentication token not found in page")
+
+    return token_match.group(1)
+
+# Define the BVKApiClient class here to avoid import issues
 class BVKApiClient:
     """API client for BVK."""
 
@@ -27,7 +154,7 @@ class BVKApiClient:
         self.session = None
         self.token = None
 
-    async def async_get_data(self) -> dict[str, Any]:
+    async def async_get_data(self):
         """Fetch data from BVK website."""
         try:
             # Create a new session if needed
@@ -145,7 +272,7 @@ class BVKApiClient:
             _LOGGER.error("Error updating BVK data: %s", str(e))
             return {"value": None}
 
-    async def _login_and_get_token(self) -> None:
+    async def _login_and_get_token(self):
         """Login to BVK website and extract the authentication token."""
         try:
             # Step 1: Login to the BVK website
@@ -257,9 +384,45 @@ class BVKApiClient:
             _LOGGER.error("Error during login and token extraction: %s", str(e))
             raise
 
-    async def async_close_session(self) -> None:
+    async def async_close_session(self):
         """Close the aiohttp session."""
         if self.session:
             await self.session.close()
             self.session = None
             _LOGGER.debug("Closed aiohttp session")
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
+async def test_api_client():
+    """Test the BVK API client.
+
+    Loads credentials from .env file. Create a .env file in the test directory
+    based on the .env.example template.
+    """
+    # Get credentials from environment variables
+    username = os.getenv("BVK_USERNAME")
+    password = os.getenv("BVK_PASSWORD")
+
+    if not username or not password:
+        _LOGGER.error("Missing credentials. Please set BVK_USERNAME and BVK_PASSWORD in .env file")
+        return
+
+    _LOGGER.info("Creating BVK API client")
+    api_client = BVKApiClient(username, password)
+
+    try:
+        _LOGGER.info("Getting data from BVK API")
+        data = await api_client.async_get_data()
+        _LOGGER.info(f"Received data: {data}")
+    except Exception as e:
+        _LOGGER.error(f"Error getting data: {e}")
+    finally:
+        _LOGGER.info("Closing API client session")
+        await api_client.async_close_session()
+
+if __name__ == "__main__":
+    _LOGGER.info("Starting BVK API client test")
+    asyncio.run(test_api_client())
+    _LOGGER.info("BVK API client test completed")
