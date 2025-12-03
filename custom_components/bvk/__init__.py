@@ -5,9 +5,20 @@ https://github.com/mkapusnik/ha-bvk
 """
 import logging
 from typing import Any
-from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+
+# Make Home Assistant imports optional to allow running unit tests without HA installed
+try:  # pragma: no cover - only exercised outside HA during tests
+    from homeassistant.core import HomeAssistant
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.const import Platform
+except Exception:  # pragma: no cover
+    from typing import Any as _Any  # type: ignore
+
+    HomeAssistant = _Any  # type: ignore
+    ConfigEntry = _Any  # type: ignore
+
+    class Platform:  # Minimal fallback for tests
+        SENSOR = "sensor"
 
 from .const import DOMAIN
 
