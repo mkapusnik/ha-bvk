@@ -6,6 +6,7 @@ on:
 
 jobs:
   test:
+    name: Run tests
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -39,7 +40,10 @@ jobs:
 #test_consumption.py
 
   merge:
+    name: Merge to master
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'write'
     needs: [test]
     steps:
       - name: Checkout code
