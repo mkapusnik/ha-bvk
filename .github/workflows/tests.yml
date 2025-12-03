@@ -42,6 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test]
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
       - name: Merge to master
         run: |
           git config --global user.name "CI/CD"
