@@ -12,6 +12,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import (
@@ -71,8 +72,10 @@ class BVKCoordinator(DataUpdateCoordinator):
         self.api_client = BVKApiClient(username, password)
         self.token_store = Store(hass, 1, DOMAIN + "_" + TOKEN_CACHE_KEY)
 
-        # Register session cleanup
-        self.async_on_remove(self._async_cleanup)
+        # Register session cleanup on Home Assistant shutdown
+        self._unsub_stop = self.hass.bus.async_listen_once(
+            EVENT_HOMEASSISTANT_STOP, self._handle_hass_stop
+        )
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from BVK website."""
@@ -101,6 +104,10 @@ class BVKCoordinator(DataUpdateCoordinator):
         """Close the API client session."""
         await self.api_client.async_close_session()
         _LOGGER.debug("Closed API client session")
+
+    async def _handle_hass_stop(self, event) -> None:
+        """Handle Home Assistant stop event to cleanup resources."""
+        await self._async_cleanup()
 
 
 class BVKSensor(CoordinatorEntity, SensorEntity):

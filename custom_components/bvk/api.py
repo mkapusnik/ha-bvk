@@ -7,12 +7,21 @@ import re
 from typing import Any, Dict, Optional
 from bs4 import BeautifulSoup
 
-from .const import (
-    BVK_LOGIN_URL,
-    BVK_MAIN_INFO_URL,
-    BVK_TARGET_DOMAIN,
-)
-from .token_utils import extract_token_from_html, extract_login_form
+# Support both package-relative imports (in Home Assistant) and absolute imports (in unit tests)
+try:  # pragma: no cover - exercised differently in HA vs tests
+    from .const import (
+        BVK_LOGIN_URL,
+        BVK_MAIN_INFO_URL,
+        BVK_TARGET_DOMAIN,
+    )
+    from .token_utils import extract_token_from_html, extract_login_form
+except Exception:  # pragma: no cover
+    from custom_components.bvk.const import (  # type: ignore
+        BVK_LOGIN_URL,
+        BVK_MAIN_INFO_URL,
+        BVK_TARGET_DOMAIN,
+    )
+    from custom_components.bvk.token_utils import extract_token_from_html, extract_login_form  # type: ignore
 
 _LOGGER = logging.getLogger(__name__)
 

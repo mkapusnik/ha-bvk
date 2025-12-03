@@ -9,5 +9,5 @@
   "integration_type": "hub",
   "config_flow": true,
   "requirements": ["beautifulsoup4"],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }
