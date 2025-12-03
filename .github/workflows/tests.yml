@@ -1,26 +1,25 @@
 name: Run Tests
 
 on:
-  pull_request:
-    branches:
-      - master
+  push:
+    branches: [ develop ]
 
 jobs:
   test:
+    name: Run tests
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v5
 
     - name: HACS validation
-      uses: "hacs/action@main"
+      uses: hacs/action@main
       with:
         category: "integration"
         ignore: "brands"
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
 
@@ -35,9 +34,26 @@ jobs:
         echo "BVK_PASSWORD=dummy_password" >> test/.env
 
     - name: Run tests
-      run: |
-        cd test
-        python -m unittest test_token_extraction.py test_login_form.py
+      working-directory: test
+      run: python -m unittest test_token_extraction.py test_login_form.py
 #test_api.py
 #test_consumption.py
+
+  merge:
+    name: Merge to master
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'write'
+    needs: [test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Merge to master
+        run: |
+          git config --global user.name "CI/CD"
+          git fetch --unshallow || true
+          git checkout master
+          git merge ${{ github.sha }}
+          git push origin master
                 
