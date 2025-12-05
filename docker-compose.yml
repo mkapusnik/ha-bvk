@@ -1,0 +1,22 @@
+services:
+  scraper:
+    build: ./scraper
+    image: 'docker.lan/bvk-scraper'
+    environment:
+      - BVK_USERNAME=${BVK_USERNAME}
+      - BVK_PASSWORD=${BVK_PASSWORD}
+      - CHECK_INTERVAL_HOURS=${CHECK_INTERVAL_HOURS:-4}
+      - TZ=Europe/Prague
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  api:
+    build: ./api
+    image: 'docker.lan/bvk-api'
+    command: uvicorn api:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
