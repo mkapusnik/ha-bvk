@@ -1,0 +1,5 @@
+selenium
+schedule
+webdriver-manager
+pytesseract
+Pillow

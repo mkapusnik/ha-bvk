@@ -20,7 +20,7 @@ jobs:
       - name: Get version
         id: version
         run: |
-          version=$(grep -oP '(?<="version": ")[^"]*' custom_components/bvk/manifest.json)
+          version=$(grep -oP '(?<="version": ")[^"]*' custom_components/bvk_water/manifest.json)
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "Version: $version"
 
@@ -46,3 +46,7 @@ jobs:
           token: ${{ secrets.PAT }}
           body: |
             Release of version ${{ steps.version.outputs.version }}
+          files: |
+            custom_components
+            hacs.json
+            README.md

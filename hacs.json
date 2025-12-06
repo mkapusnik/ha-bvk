@@ -1,4 +1,6 @@
 {
-  "name": "BVK Water Consumption Meter",
-  "country": ["CZ"]
+    "name": "BVK Water Meter",
+    "country": [
+        "CZ"
+    ]
 }
