@@ -1,3 +1,3 @@
-DOMAIN = "bvk_water"
+DOMAIN = "bvk"
 CONF_API_URL = "api_url"
 DEFAULT_API_URL = "http://localhost:8000/latest"
