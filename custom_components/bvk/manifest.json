@@ -1,5 +1,5 @@
 {
-    "domain": "bvk_water",
+    "domain": "bvk",
     "name": "BVK Water Meter",
     "codeowners": [
         "@mkapusnik"
