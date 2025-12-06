@@ -24,9 +24,31 @@ jobs:
       - name: Get version
         id: version
         run: |
-          version=$(grep -oP '(?<="version": ")[^"]*' custom_components/bvk/manifest.json)
-          echo "version=$version" >> $GITHUB_OUTPUT
-          echo "Version: $version"
+          # Configure git
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Get current version
+          current_version=$(jq -r '.version' custom_components/bvk/manifest.json)
+          echo "Current version: $current_version"
+          
+          # Increment patch version
+          IFS='.' read -r major minor patch <<< "$current_version"
+          new_patch=$((patch + 1))
+          new_version="$major.$minor.$new_patch"
+          echo "New version: $new_version"
+
+          # Update manifest.json
+          tmp=$(mktemp)
+          jq --arg v "$new_version" '.version = $v' custom_components/bvk/manifest.json > "$tmp" && mv "$tmp" custom_components/bvk/manifest.json
+          
+          # Commit and push
+          git add custom_components/bvk/manifest.json
+          git commit -m "Bump version to $new_version [skip ci]"
+          git push
+
+          # Set output
+          echo "version=$new_version" >> $GITHUB_OUTPUT
 
       - name: Check if release exists
         id: check_release
