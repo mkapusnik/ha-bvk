@@ -4,6 +4,10 @@ on:
   push:
     branches: [ develop ]
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   test-api:
     name: Test API
