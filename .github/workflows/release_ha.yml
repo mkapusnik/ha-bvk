@@ -1,9 +1,10 @@
-name: Release
+name: Release HA
 
 on:
   push:
     branches: [ master ]
     paths: ['custom_components/**', 'hacs.json']
+  workflow_dispatch: 
 
 concurrency:
   group: ${{ github.workflow }}

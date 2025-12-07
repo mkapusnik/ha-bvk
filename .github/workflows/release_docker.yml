@@ -1,9 +1,10 @@
-name: Release
+name: Release Docker
 
 on:
   push:
     branches: [ master ]
-    paths: ['!custom_components/**', '!hacs.json']
+    paths: ['api/**', 'scraper/**']
+  workflow_dispatch: 
 
 concurrency:
   group: ${{ github.workflow }}
