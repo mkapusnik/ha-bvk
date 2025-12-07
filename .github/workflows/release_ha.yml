@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     branches: [ master ]
+    paths: ['custom_components/**', 'hacs.json']
 
 concurrency:
   group: ${{ github.workflow }}
@@ -30,8 +31,7 @@ jobs:
         id: version
         run: |
           # Configure git
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config --global user.name "CI/CD"
 
           # Get current version
           current_version=$(jq -r '.version' custom_components/bvk/manifest.json)
@@ -65,17 +65,3 @@ jobs:
           token: ${{ secrets.PAT }}
           body: |
             Release of version ${{ steps.version.outputs.version }}
-
-      - name: Tag images as latest and push
-        env:
-          tag: 'ghcr.io/${{ github.repository }}'
-        run: |
-          echo "${{ github.token }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-          docker pull ${{ env.tag }}/api:nightly
-          docker tag ${{ env.tag }}/api:nightly ${{ env.tag }}/api:latest
-          docker push ${{ env.tag }}/api:latest
-
-          docker pull ${{ env.tag }}/scraper:nightly
-          docker tag ${{ env.tag }}/scraper:nightly ${{ env.tag }}/scraper:latest
-          docker push ${{ env.tag }}/scraper:latest

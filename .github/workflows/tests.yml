@@ -16,18 +16,10 @@ jobs:
   test-api:
     name: Test API
     runs-on: ubuntu-latest
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        architecture:
-#          - amd64
-#          - arm64
     env:
       tag: 'ghcr.io/${{ github.repository }}/api:nightly'
     steps:
- #     - uses: actions/checkout@v5
-
-      - name: Log into GitHub Container Registry
+      - name: Log into GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -39,14 +31,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-#      - name: Build image
-#        working-directory: api
-#        run: docker build --platform linux/${{ matrix.architecture }} -t ${{ env.tag }} .
-
-#      - name: Push image
-#        working-directory: api
-#        run: docker push ${{ env.tag }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -62,7 +46,7 @@ jobs:
     env:
       tag: 'ghcr.io/${{ github.repository }}/scraper:nightly'
     steps:
-      - name: Log into GitHub Container Registry
+      - name: Log into GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -74,14 +58,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-#      - name: Build image
-#        working-directory: scraper
-#        run: docker build --platform linux/${{ matrix.architecture }} -t ${{ env.tag }} .
-
-#      - name: Push image
-#        working-directory: scraper
-#        run: docker push ${{ env.tag }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
