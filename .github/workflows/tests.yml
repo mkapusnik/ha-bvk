@@ -8,6 +8,10 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   test-api:
     name: Test API
@@ -48,8 +52,6 @@ jobs:
   merge:
     name: Merge to master
     runs-on: ubuntu-latest
-    permissions:
-      contents: 'write'
     needs: [test-api, test-scraper]
     steps:
       - name: Checkout code
