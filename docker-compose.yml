@@ -5,7 +5,7 @@ services:
     environment:
       - BVK_USERNAME=${BVK_USERNAME}
       - BVK_PASSWORD=${BVK_PASSWORD}
-      - CHECK_INTERVAL_HOURS=${CHECK_INTERVAL_HOURS:-4}
+      - CHECK_INTERVAL_HOURS=${CHECK_INTERVAL_HOURS:-1}
       - TZ=Europe/Prague
     volumes:
       - ./data:/app/data

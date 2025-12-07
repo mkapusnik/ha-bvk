@@ -226,36 +226,45 @@ def job():
         image_bytes = base64.b64decode(canvas_base64)
         image = Image.open(io.BytesIO(image_bytes))
         
+        # Save RAW image for tuning (Commented out for production)
+        # image.save(os.path.join(DATA_DIR, "raw_meter.png"))
+        
         # Preprocessing
         # 1. Convert to grayscale
         image = image.convert('L')
         
-        # 2. Resize (2x - Tuned: 2x works better than 3x for this font/size)
+        # 2. Resize (3x - Verified working in logs)
         width, height = image.size
-        image = image.resize((width * 2, height * 2), Image.Resampling.LANCZOS)
+        # Scale 3x
+        image = image.resize((width * 3, height * 3), Image.Resampling.LANCZOS)
         
-        # 3. Handle mixed polarity (Integers: White on Black, Decimals: Red on White)
-        # Split image at approx 64% width (5 digits vs 3 digits) - adjusted to avoid cutting off last integer
+        # 3. Handle mixed polarity
         split_x = int(image.width * 0.65)
         
         left_part = image.crop((0, 0, split_x, image.height))
         right_part = image.crop((split_x, 0, image.width, image.height))
         
-        # Process Left (Integers): Invert to get Black on White
+        # Process Left (Integers)
         left_part = ImageOps.invert(left_part)
-        # Threshold Left part as well to get crisp text
+        left_part = ImageOps.autocontrast(left_part) # Boost contrast
         left_part = left_part.point(lambda x: 0 if x < 150 else 255, 'L')
         
-        # Process Right (Decimals): Autocontrast to handle red digits better than fixed threshold
+        # Process Right (Decimals)
+        # Apply autocontrast to normalize red digits against white background
         right_part = ImageOps.autocontrast(right_part)
-        
-        # Stitch back (No Gap, as this worked best previously)
-        processed_image = Image.new('L', (width * 2, height * 2))
+        # Then apply threshold (180 worked in Step 1539)
+        right_part = right_part.point(lambda x: 0 if x < 180 else 255, 'L')
+          
+        # Stitch back
+        processed_image = Image.new('L', (width * 3, height * 3))
         processed_image.paste(left_part, (0, 0))
         processed_image.paste(right_part, (split_x, 0))
         
         # Add PADDING to the full image to help OCR with edges
         processed_image = ImageOps.expand(processed_image, border=50, fill=255)
+        
+        # Save debug image (Commented out for production)
+        # processed_image.save(os.path.join(DATA_DIR, "debug_meter_processed.png"))
         
         # Perform OCR on full image
         custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
