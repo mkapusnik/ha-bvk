@@ -12,34 +12,38 @@ jobs:
   test-api:
     name: Test API
     runs-on: ubuntu-latest
+    env:
+      tag: 'ghcr.io/${{ github.repository }}/api:nightly'
     steps:
       - uses: actions/checkout@v5
       - name: Build image
         working-directory: api
-        run: docker build -t ghcr.io/${{ github.repository }}-api:nightly .
+        run: docker build -t ${{ env.tag }} .
 
       - name: Log in to GitHub Container Registry
         run: echo "${{ github.token }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Push image
         working-directory: api
-        run: docker push ghcr.io/${{ github.repository }}-api:nightly
+        run: docker push ${{ env.tag }}
 
   test-scraper:
     name: Test Scraper
     runs-on: ubuntu-latest
+    env:
+      tag: 'ghcr.io/${{ github.repository }}/scraper:nightly'
     steps:
       - uses: actions/checkout@v5
       - name: Build image
         working-directory: scraper
-        run: docker build -t ghcr.io/${{ github.repository }}-scraper:nightly .
+        run: docker build -t ${{ env.tag }} .
 
       - name: Log in to GitHub Container Registry
         run: echo "${{ github.token }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Push image
         working-directory: scraper
-        run: docker push ghcr.io/${{ github.repository }}-scraper:nightly
+        run: docker push ${{ env.tag }}
 
   merge:
     name: Merge to master
