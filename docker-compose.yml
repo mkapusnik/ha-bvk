@@ -1,7 +1,7 @@
 services:
   scraper:
     build: ./scraper
-    image: ghcr.io/mkapusnik/ha-bvk/scraper:la
+    image: ghcr.io/mkapusnik/ha-bvk/scraper:latest
     environment:
       - BVK_USERNAME=${BVK_USERNAME}
       - BVK_PASSWORD=${BVK_PASSWORD}
