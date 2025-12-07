@@ -239,64 +239,60 @@ def job():
         image = image.resize((width * 3, height * 3), Image.Resampling.LANCZOS)
         
         # 3. Handle mixed polarity
-        # IMPORTANT: Split adjusted to 0.67 as meter crossed 100m³ (5→6 digits)
-        # User confirmed 0.67 looks visually correct
-        split_x = int(image.width * 0.67)
+        # Split adjusted to 0.65 based on diagnostic analysis
+        # Testing showed 0.64-0.68 all correctly read 118307, using 0.65 as middle ground
+        split_x = int(image.width * 0.65)
         
         left_part = image.crop((0, 0, split_x, image.height))
         right_part = image.crop((split_x, 0, image.width, image.height))
         
         # Process Left (Integers)
         left_part = ImageOps.invert(left_part)
-        left_part = ImageOps.autocontrast(left_part) # Re-enabled: needed for reliable OCR
+        left_part = ImageOps.autocontrast(left_part)
         left_part = left_part.point(lambda x: 0 if x < 150 else 255, 'L')
         
         # Process Right (Decimals)
-        # Apply autocontrast to normalize red digits against white background
         right_part = ImageOps.autocontrast(right_part)
-        # Then apply threshold (180 worked in Step 1539)
         right_part = right_part.point(lambda x: 0 if x < 180 else 255, 'L')
           
-        # Stitch back
+        # Stitch back together for combined OCR
         processed_image = Image.new('L', (width * 3, height * 3))
         processed_image.paste(left_part, (0, 0))
         processed_image.paste(right_part, (split_x, 0))
         
-        # Add PADDING to the full image to help OCR with edges
+        # Add padding to the full image to help OCR with edges
         processed_image = ImageOps.expand(processed_image, border=50, fill=255)
         
-        # Save debug image (Disabled for production)
+        # Save debug images (Disabled for production)
+        # image.save(os.path.join(DATA_DIR, "raw_meter.png"))
         # processed_image.save(os.path.join(DATA_DIR, "debug_meter_processed.png"))
         
-        # Perform OCR on full image
+        # Perform OCR on combined image
         custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
         text = pytesseract.image_to_string(processed_image, config=custom_config).strip()
         
         logger.info(f"OCR Raw Result: {text}")
         
-        # Format Reading
+        # Extract digits and format with EXACTLY 3 decimal places
         import re
         raw_digits = "".join(re.findall(r'\d+', text))
         
-        if len(raw_digits) > 3:
-            # Assume last 3 digits are decimals
-            val_dec = raw_digits[-3:]
-            val_int = raw_digits[:-3]
-        else:
-            # Fallback for short numbers
-            val_int = raw_digits
-            val_dec = "0"
-            
-        # Strip leading zeros from integer part
+        # Ensure we always have at least 4 digits (1 integer + 3 decimal)
+        if not raw_digits:
+            raw_digits = "0000"
+        elif len(raw_digits) < 4:
+            # Pad with leading zeros
+            raw_digits = raw_digits.zfill(4)
+        
+        # ALWAYS take last 3 digits as decimal, rest as integer
+        # This ensures decimal point is ALWAYS in correct position
+        val_dec = raw_digits[-3:]
+        val_int = raw_digits[:-3] or "0"  # If empty, default to "0"
+        
+        # Strip leading zeros from integer part (but keep at least one digit)
         val_int = val_int.lstrip('0') or "0"
-            
-        if len(val_int) > 6:
-            val_int = val_int[-6:]
-            
-        # Decimal: Max 3 digits.
-        if len(val_dec) > 3:
-            val_dec = val_dec[:3]
-            
+        
+        # Concatenate with literal decimal point
         reading = f"{val_int}.{val_dec}"
             
         logger.info(f"Formatted Reading: {reading}")
