@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     branches: [ master ]
+    paths: ['custom_components/**', 'hacs.json']
 
 concurrency:
   group: ${{ github.workflow }}
@@ -30,8 +31,7 @@ jobs:
         id: version
         run: |
           # Configure git
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config --global user.name "CI/CD"
 
           # Get current version
           current_version=$(jq -r '.version' custom_components/bvk/manifest.json)
@@ -65,30 +65,3 @@ jobs:
           token: ${{ secrets.PAT }}
           body: |
             Release of version ${{ steps.version.outputs.version }}
-
-      - name: Log into GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Tag API image
-        uses: akhilerm/tag-push-action@v2
-        env:
-          tag: 'ghcr.io/${{ github.repository }}'
-        with:
-          src:  ${{ env.tag }}/api:nightly  
-          dst: |
-            ${{ env.tag }}/api:latest
-            ${{ env.tag }}/api:${{ steps.version.outputs.version }}
-
-      - name: Tag Scraper image
-        uses: akhilerm/tag-push-action@v2
-        env:
-          tag: 'ghcr.io/${{ github.repository }}'
-        with:
-          src:  ${{ env.tag }}/scraper:nightly  
-          dst: |
-            ${{ env.tag }}/scraper:latest
-            ${{ env.tag }}/scraper:${{ steps.version.outputs.version }}
