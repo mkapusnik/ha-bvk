@@ -210,7 +210,7 @@ def job():
         
         # Wait for animation to finish
         logger.info("Waiting for meter animation...")
-        time.sleep(10)
+        time.sleep(15)
         
         # Re-acquire canvas to avoid StaleElementReferenceException
         canvas = driver.find_element(By.CSS_SELECTOR, ".OdometerIndexCanvas canvas")
@@ -226,7 +226,7 @@ def job():
         image_bytes = base64.b64decode(canvas_base64)
         image = Image.open(io.BytesIO(image_bytes))
         
-        # Save RAW image for tuning (Commented out for production)
+        # Save RAW image for tuning (Disabled for production)
         # image.save(os.path.join(DATA_DIR, "raw_meter.png"))
         
         # Preprocessing
@@ -239,14 +239,16 @@ def job():
         image = image.resize((width * 3, height * 3), Image.Resampling.LANCZOS)
         
         # 3. Handle mixed polarity
-        split_x = int(image.width * 0.65)
+        # IMPORTANT: Split adjusted to 0.67 as meter crossed 100m³ (5→6 digits)
+        # User confirmed 0.67 looks visually correct
+        split_x = int(image.width * 0.67)
         
         left_part = image.crop((0, 0, split_x, image.height))
         right_part = image.crop((split_x, 0, image.width, image.height))
         
         # Process Left (Integers)
         left_part = ImageOps.invert(left_part)
-        left_part = ImageOps.autocontrast(left_part) # Boost contrast
+        left_part = ImageOps.autocontrast(left_part) # Re-enabled: needed for reliable OCR
         left_part = left_part.point(lambda x: 0 if x < 150 else 255, 'L')
         
         # Process Right (Decimals)
@@ -263,7 +265,7 @@ def job():
         # Add PADDING to the full image to help OCR with edges
         processed_image = ImageOps.expand(processed_image, border=50, fill=255)
         
-        # Save debug image (Commented out for production)
+        # Save debug image (Disabled for production)
         # processed_image.save(os.path.join(DATA_DIR, "debug_meter_processed.png"))
         
         # Perform OCR on full image
