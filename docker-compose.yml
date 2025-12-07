@@ -1,7 +1,7 @@
 services:
   scraper:
     build: ./scraper
-    image: 'docker.lan/bvk-scraper'
+    image: ghcr.io/mkapusnik/ha-bvk/scraper:latest
     environment:
       - BVK_USERNAME=${BVK_USERNAME}
       - BVK_PASSWORD=${BVK_PASSWORD}
@@ -13,9 +13,9 @@ services:
 
   api:
     build: ./api
-    image: 'docker.lan/bvk-api'
+    image: ghcr.io/mkapusnik/ha-bvk/api:latest
     volumes:
       - ./data:/app/data
     ports:
-      - "8000:8000"
+      - "8100:8000"
     restart: unless-stopped
