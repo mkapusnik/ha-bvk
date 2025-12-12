@@ -30,7 +30,7 @@ jobs:
           password: ${{ github.token }}
 
       - name: Tag API image
-        uses: akhilerm/tag-push-action@v2
+        uses: akhilerm/tag-push-action@v2.2.0
         env:
           tag: 'ghcr.io/${{ github.repository }}'
         with:
@@ -38,7 +38,7 @@ jobs:
           dst: ${{ env.tag }}/api:latest
 
       - name: Tag Scraper image
-        uses: akhilerm/tag-push-action@v2
+        uses: akhilerm/tag-push-action@v2.2.0
         env:
           tag: 'ghcr.io/${{ github.repository }}'
         with:
