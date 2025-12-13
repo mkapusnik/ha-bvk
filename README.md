@@ -61,3 +61,34 @@ You need a machine capable of running Docker (e.g., Raspberry Pi, NAS, Server) t
 This integration provides a single sensor:
 -   `sensor.bvk_reading`: The current water meter reading in m³.
 -   Attribute `timestamp`: Time of the last successful scrape.
+
+## Capturing Mockups for Unit Tests
+To generate offline mockups of the BVK workflow (Login page, MainInfo page, Suez page, and raw meter canvas) and store them as part of the source code, use the snapshot script. By default, it saves into `scraper/tests/resources/` inside the repository.
+
+1. Ensure your `.env` is configured with `BVK_USERNAME` and `BVK_PASSWORD`.
+2. Build and run the stack as usual:
+   ```bash
+   docker compose up -d --build
+   ```
+3. Execute the snapshot workflow inside the scraper container (default output: `scraper/tests/resources/`):
+   ```bash
+   docker compose exec scraper python -m scraper.snapshot_workflow
+   ```
+
+What gets saved by default (lightweight set suitable for committing):
+- `*_login_page.html`
+- `*_main_info_page.html`
+- `*_suez_page.html`
+- `*_raw_meter_canvas_base64.png` (canvas export)
+
+Optional: include full-page and element screenshots (PNG), which are larger, by passing `--include-screens`:
+```bash
+docker compose exec scraper python -m scraper.snapshot_workflow --include-screens
+```
+
+You can also change the destination with `--out` (inside the container). For example, to save into the Docker volume (not tracked by Git):
+```bash
+docker compose exec scraper python -m scraper.snapshot_workflow --out /app/data/mockups
+```
+
+Commit the curated files under `scraper/tests/resources/` to use them as fixtures for unit tests.

@@ -1,25 +1,28 @@
-import os
-import time
 import json
 import logging
-import schedule
+import os
+import sys
+import time
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("/app/data/scraper.log")
-    ]
-)
+import schedule
+from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
+# Configure logging (stdout only, guard against double-initialization)
+_root_logger = logging.getLogger()
+if not _root_logger.handlers:
+    handler = logging.StreamHandler(stream=sys.stdout)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    _root_logger.setLevel(logging.INFO)
+    _root_logger.addHandler(handler)
+
+# Use a module logger that propagates to root (no extra handlers to avoid duplicates)
 logger = logging.getLogger(__name__)
 
 # Configuration
@@ -330,6 +333,8 @@ def main():
     # Schedule
     logger.info(f"Scheduling job every {CHECK_INTERVAL_HOURS} hours.")
     schedule.every(CHECK_INTERVAL_HOURS).hours.do(job)
+    # Log number of scheduled jobs to ensure it's not duplicated
+    logger.info(f"Scheduled jobs: {len(schedule.get_jobs())}")
 
     while True:
         schedule.run_pending()
