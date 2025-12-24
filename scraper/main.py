@@ -25,6 +25,8 @@ if not _root_logger.handlers:
 # Use a module logger that propagates to root (no extra handlers to avoid duplicates)
 logger = logging.getLogger(__name__)
 
+
+
 # Configuration
 BVK_URL = "https://zis.bvk.cz"
 BVK_MAIN_INFO_URL = "https://zis.bvk.cz/Userdata/MainInfo.aspx"
@@ -289,20 +291,23 @@ def job():
         
         # Process Right (Decimals)
         right_part = ImageOps.autocontrast(right_part)
-        right_part = right_part.point(lambda x: 0 if x < 180 else 255, 'L')
+        right_part = right_part.point(lambda x: 0 if x < 150 else 255, 'L')
           
         # Perform OCR on parts separately
         custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
+        custom_config_dec = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
         
         # 1. Integer Part (Left)
         left_padded = ImageOps.expand(left_part, border=50, fill=255)
         text_int = pytesseract.image_to_string(left_padded, config=custom_config).strip()
         logger.info(f"OCR Integer Raw: {text_int}")
+        left_padded.save(os.path.join(DATA_DIR, "debug_left.png"))
         
         # 2. Decimal Part (Right)
         right_padded = ImageOps.expand(right_part, border=50, fill=255)
-        text_dec = pytesseract.image_to_string(right_padded, config=custom_config).strip()
+        text_dec = pytesseract.image_to_string(right_padded, config=custom_config_dec).strip()
         logger.info(f"OCR Decimal Raw: {text_dec}")
+        right_padded.save(os.path.join(DATA_DIR, "debug_right.png"))
         
         # Process Integer
         import re
