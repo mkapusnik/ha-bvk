@@ -1,0 +1,11 @@
+[project]
+name = "antigravity-bvk"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "django-scheduler>=0.10.1",
+    "fastapi>=0.124.4",
+    "pillow>=12.0.0",
+    "selenium>=4.39.0",
+]
