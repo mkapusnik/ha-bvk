@@ -32,19 +32,25 @@ def process_and_read(image, scale=2, threshold_method="autocontrast", padding=50
         
     # OCR Separately
     custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
+    custom_config_dec = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
     
     left_padded = ImageOps.expand(left_part, border=padding, fill=255)
     text_int = pytesseract.image_to_string(left_padded, config=custom_config).strip()
     
     right_padded = ImageOps.expand(right_part, border=padding, fill=255)
-    text_dec = pytesseract.image_to_string(right_padded, config=custom_config).strip()
+    text_dec = pytesseract.image_to_string(right_padded, config=custom_config_dec).strip()
     
     # Construct result
     import re
     val_int = "".join(re.findall(r'\d+', text_int))
     val_int = val_int.lstrip('0') or "0"
     
-    val_dec = "".join(re.findall(r'\d+', text_dec)) or "0"
+    val_dec = "".join(re.findall(r'\d+', text_dec))
+    
+    if len(val_dec) > 3:
+        val_dec = val_dec[:3]
+        
+    val_dec = val_dec or "0"
     
     return f"{val_int}.{val_dec}"
 
