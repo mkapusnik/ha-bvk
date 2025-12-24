@@ -119,6 +119,39 @@ def validate_reading(new_reading_str):
             logger.info(f"Validation Check: New={new_val}, Old={last_val}")
             
             if new_val >= last_val:
+                # Check for massive jumps (consumption > 500 * days)
+                # Parse timestamps
+                try:
+                    last_ts_str = last_entry["timestamp"]
+                    # Current time is basically "now" since we are validating a reading just taken
+                    # But we can't easily pass "now" here without changing signature.
+                    # However, "timestamp" in save_data is datetime.now().isoformat()
+                    # We can assume "now" or relatively close.
+                    from datetime import datetime
+                    last_ts = datetime.fromisoformat(last_ts_str)
+                    now_ts = datetime.now()
+                    
+                    diff = now_ts - last_ts
+                    days_diff = diff.total_seconds() / 86400.0
+                    
+                    # Avoid division by zero or weirdness if ran immediately
+                    if days_diff < 0.01: 
+                        days_diff = 0.01
+                        
+                    consumption = new_val - last_val
+                    max_allowed = 500 * days_diff
+                    
+                    # If it's been a long time (e.g. first run in weeks), this might be large,
+                    # but 500 per day is huge (avg household is <1 m3/day).
+                    # 500 is extremely generous, so it catches only massive OCR errors (decimals shift).
+                    
+                    if consumption > max_allowed:
+                        logger.warning(f"Validation FAILED: Consumption {consumption:.2f} > Max {max_allowed:.2f} (Days: {days_diff:.2f}). Huge jump detected.")
+                        return False
+                        
+                except Exception as e:
+                    logger.warning(f"Validation timestamp check failed: {e}. Proceeding with simple check.")
+
                 return True
             
             # Reset detection
@@ -258,42 +291,29 @@ def job():
         right_part = ImageOps.autocontrast(right_part)
         right_part = right_part.point(lambda x: 0 if x < 180 else 255, 'L')
           
-        # Stitch back together for combined OCR
-        processed_image = Image.new('L', (width * 3, height * 3))
-        processed_image.paste(left_part, (0, 0))
-        processed_image.paste(right_part, (split_x, 0))
-        
-        # Add padding to the full image to help OCR with edges
-        processed_image = ImageOps.expand(processed_image, border=50, fill=255)
-        
-        # Save debug images (Disabled for production)
-        # image.save(os.path.join(DATA_DIR, "raw_meter.png"))
-        # processed_image.save(os.path.join(DATA_DIR, "debug_meter_processed.png"))
-        
-        # Perform OCR on combined image
+        # Perform OCR on parts separately
         custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
-        text = pytesseract.image_to_string(processed_image, config=custom_config).strip()
         
-        logger.info(f"OCR Raw Result: {text}")
+        # 1. Integer Part (Left)
+        left_padded = ImageOps.expand(left_part, border=50, fill=255)
+        text_int = pytesseract.image_to_string(left_padded, config=custom_config).strip()
+        logger.info(f"OCR Integer Raw: {text_int}")
         
-        # Extract digits and format with EXACTLY 3 decimal places
+        # 2. Decimal Part (Right)
+        right_padded = ImageOps.expand(right_part, border=50, fill=255)
+        text_dec = pytesseract.image_to_string(right_padded, config=custom_config).strip()
+        logger.info(f"OCR Decimal Raw: {text_dec}")
+        
+        # Process Integer
         import re
-        raw_digits = "".join(re.findall(r'\d+', text))
-        
-        # Ensure we always have at least 4 digits (1 integer + 3 decimal)
-        if not raw_digits:
-            raw_digits = "0000"
-        elif len(raw_digits) < 4:
-            # Pad with leading zeros
-            raw_digits = raw_digits.zfill(4)
-        
-        # ALWAYS take last 3 digits as decimal, rest as integer
-        # This ensures decimal point is ALWAYS in correct position
-        val_dec = raw_digits[-3:]
-        val_int = raw_digits[:-3] or "0"  # If empty, default to "0"
-        
-        # Strip leading zeros from integer part (but keep at least one digit)
+        val_int = "".join(re.findall(r'\d+', text_int))
         val_int = val_int.lstrip('0') or "0"
+        
+        # Process Decimal
+        val_dec = "".join(re.findall(r'\d+', text_dec))
+        # Default to "0" if empty
+        if not val_dec:
+             val_dec = "0"
         
         # Concatenate with literal decimal point
         reading = f"{val_int}.{val_dec}"
