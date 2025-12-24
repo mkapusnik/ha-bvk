@@ -305,6 +305,17 @@ def job():
             save_data(reading)
         else:
             logger.warning("OCR failed or reading was rejected by validation.")
+
+        # If we reached this point without raising exceptions, consider the run successful
+        # and delete any previous error screenshot to reflect last successful state
+        try:
+            err_path = os.path.join(DATA_DIR, "error_screenshot.png")
+            if os.path.exists(err_path):
+                os.remove(err_path)
+                logger.info("Removed previous error screenshot.")
+        except Exception as _cleanup_err:
+            # Do not fail the job because of cleanup
+            logger.debug(f"Could not remove error screenshot: {_cleanup_err}")
             
     except Exception as e:
         logger.error(f"An error occurred: {e}")
