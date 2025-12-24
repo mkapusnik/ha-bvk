@@ -264,8 +264,8 @@ def job():
         image_bytes = base64.b64decode(canvas_base64)
         image = Image.open(io.BytesIO(image_bytes))
         
-        # Save RAW image for tuning (Disabled for production)
-        # image.save(os.path.join(DATA_DIR, "raw_meter.png"))
+        # Save RAW image for tuning
+        image.save(os.path.join(DATA_DIR, "raw_meter.png"))
         
         # Preprocessing
         # 1. Convert to grayscale
@@ -295,7 +295,7 @@ def job():
           
         # Perform OCR on parts separately
         custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
-        custom_config_dec = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
+        custom_config_dec = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
         
         # 1. Integer Part (Left)
         left_padded = ImageOps.expand(left_part, border=50, fill=255)
@@ -316,6 +316,16 @@ def job():
         
         # Process Decimal
         val_dec = "".join(re.findall(r'\d+', text_dec))
+        
+        # Ensure max 3 digits for decimal part
+        if len(val_dec) > 3:
+            # If we have more than 3 digits, simple truncation is the safest bet
+            # assuming digits are read left-to-right.
+            # Example: "1210" vs "720". If the first digit is correct, we keep it.
+            # But here "1" != "7". So truncation won't fix the OCR error itself,
+            # but getting the length right is a prerequisite.
+            val_dec = val_dec[:3]
+            
         # Default to "0" if empty
         if not val_dec:
              val_dec = "0"
