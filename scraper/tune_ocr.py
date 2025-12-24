@@ -26,24 +26,27 @@ def process_and_read(image, scale=2, threshold_method="autocontrast", padding=50
     if threshold_method == "autocontrast":
         right_part = ImageOps.autocontrast(right_part)
     elif threshold_method == "standard":
-        # Threshold at 150
         right_part = right_part.point(lambda x: 0 if x < 150 else 255, 'L')
     elif threshold_method == "aggressive":
-        # Threshold at 200
         right_part = right_part.point(lambda x: 0 if x < 200 else 255, 'L')
         
-    # Stitch
-    processed_image = Image.new('L', (img.width, img.height))
-    processed_image.paste(left_part, (0, 0))
-    processed_image.paste(right_part, (split_x, 0))
-    
-    # Padding
-    processed_image = ImageOps.expand(processed_image, border=padding, fill=255)
-    
-    # OCR
+    # OCR Separately
     custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
-    text = pytesseract.image_to_string(processed_image, config=custom_config).strip()
-    return text
+    
+    left_padded = ImageOps.expand(left_part, border=padding, fill=255)
+    text_int = pytesseract.image_to_string(left_padded, config=custom_config).strip()
+    
+    right_padded = ImageOps.expand(right_part, border=padding, fill=255)
+    text_dec = pytesseract.image_to_string(right_padded, config=custom_config).strip()
+    
+    # Construct result
+    import re
+    val_int = "".join(re.findall(r'\d+', text_int))
+    val_int = val_int.lstrip('0') or "0"
+    
+    val_dec = "".join(re.findall(r'\d+', text_dec)) or "0"
+    
+    return f"{val_int}.{val_dec}"
 
     print(f"Loading {RAW_IMAGE_PATH}...")
     original = Image.open(RAW_IMAGE_PATH)
