@@ -44,6 +44,20 @@ Notes:
 `.github/workflows/tests.yml` currently builds and pushes Docker images; it does not run unit tests or linters.
 If you add tests, consider updating CI to execute them.
 
+### OCR tests (recommended)
+
+The OCR unit test uses `pytesseract` which calls the `tesseract` binary.
+This binary may not be installed on developer machines (especially Windows).
+For consistent results, run OCR-related tests inside the `scraper` Docker image.
+
+- Run OCR tests in container:
+  - `docker compose build scraper`
+  - `docker compose run --rm scraper python -m pytest -q`
+
+Notes:
+- The repo path is copied into the scraper image under `/app/scraper`.
+- `scraper/tests/resources/*.png` fixtures are used; filenames must match expected readings.
+
 ### Running a single test
 
 No active test suite is present in the main tree (`scraper/tests/` only contains `resources/`).
