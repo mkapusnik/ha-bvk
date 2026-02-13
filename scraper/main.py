@@ -35,6 +35,7 @@ USERNAME = os.environ.get("BVK_USERNAME")
 PASSWORD = os.environ.get("BVK_PASSWORD")
 CHECK_INTERVAL_HOURS = int(os.environ.get("CHECK_INTERVAL_HOURS", 4))
 DATA_DIR = "/app/data"
+IMAGES_DIR = os.path.join(DATA_DIR, "images")
 
 
 def get_driver():
@@ -62,9 +63,11 @@ def get_driver():
     return driver
 
 
-def save_data(reading):
+def save_data(reading, image_filename=None):
     timestamp = datetime.now().isoformat()
     data = {"timestamp": timestamp, "reading": reading}
+    if image_filename:
+        data["image"] = image_filename
 
     # Save latest
     latest_path = os.path.join(DATA_DIR, "latest.json")
@@ -296,8 +299,13 @@ def job():
         image_bytes = base64.b64decode(canvas_base64)
         image = Image.open(io.BytesIO(image_bytes))
 
-        # Save RAW image for tuning
+        # Save RAW image for tuning (stable filename) and archive copy (timestamp-based)
         image.save(os.path.join(DATA_DIR, "raw_meter.png"))
+
+        captured_ts = datetime.now().isoformat(timespec="seconds")
+        safe_ts = captured_ts.replace(":", "-")
+        image_filename = f"{safe_ts}.png"
+        image.save(os.path.join(IMAGES_DIR, image_filename))
 
         reading = ocr_meter_reading_from_image(image)
 
@@ -305,7 +313,7 @@ def job():
 
         if reading and validate_reading(reading):
             logger.info(f"Found valid reading: {reading}")
-            save_data(reading)
+            save_data(reading, image_filename=image_filename)
         else:
             logger.warning("OCR failed or reading was rejected by validation.")
 
@@ -341,6 +349,7 @@ def main():
 
     # Ensure data directory exists
     os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(IMAGES_DIR, exist_ok=True)
 
     # Run once immediately
     job()
