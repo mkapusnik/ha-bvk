@@ -73,7 +73,7 @@ jobs:
     needs: [test-api, test-scraper]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.PAT }}
 
