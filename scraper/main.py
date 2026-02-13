@@ -13,18 +13,19 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from scraper.ocr import ocr_meter_reading_from_image
+
 # Configure logging (stdout only, guard against double-initialization)
 _root_logger = logging.getLogger()
 if not _root_logger.handlers:
     handler = logging.StreamHandler(stream=sys.stdout)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     _root_logger.setLevel(logging.INFO)
     _root_logger.addHandler(handler)
 
 # Use a module logger that propagates to root (no extra handlers to avoid duplicates)
 logger = logging.getLogger(__name__)
-
 
 
 # Configuration
@@ -34,6 +35,8 @@ USERNAME = os.environ.get("BVK_USERNAME")
 PASSWORD = os.environ.get("BVK_PASSWORD")
 CHECK_INTERVAL_HOURS = int(os.environ.get("CHECK_INTERVAL_HOURS", 4))
 DATA_DIR = "/app/data"
+IMAGES_DIR = os.path.join(DATA_DIR, "images")
+
 
 def get_driver():
     chrome_options = Options()
@@ -44,30 +47,33 @@ def get_driver():
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_argument("--allow-running-insecure-content")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    
+    chrome_options.add_argument(
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    )
+
     # Chromium specific options
     chrome_options.binary_location = "/usr/bin/chromium"
-    
+
     # Initialize driver with service
     from selenium.webdriver.chrome.service import Service
+
     service = Service("/usr/bin/chromedriver")
-    
+
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
-def save_data(reading):
+
+def save_data(reading, image_filename=None):
     timestamp = datetime.now().isoformat()
-    data = {
-        "timestamp": timestamp,
-        "reading": reading
-    }
-    
+    data = {"timestamp": timestamp, "reading": reading}
+    if image_filename:
+        data["image"] = image_filename
+
     # Save latest
     latest_path = os.path.join(DATA_DIR, "latest.json")
     with open(latest_path, "w") as f:
         json.dump(data, f, indent=2)
-    
+
     # Append to history
     history_path = os.path.join(DATA_DIR, "history.json")
     history = []
@@ -77,12 +83,13 @@ def save_data(reading):
                 history = json.load(f)
         except json.JSONDecodeError:
             logger.warning("Could not decode history.json, starting fresh.")
-    
+
     history.append(data)
     with open(history_path, "w") as f:
         json.dump(history, f, indent=2)
-        
+
     logger.info(f"Saved reading: {reading}")
+
 
 def validate_reading(new_reading_str):
     """
@@ -91,35 +98,36 @@ def validate_reading(new_reading_str):
     """
     history_path = os.path.join(DATA_DIR, "history.json")
     if not os.path.exists(history_path):
-        return True # No history, assume valid
+        return True  # No history, assume valid
 
     try:
         with open(history_path, "r") as f:
             history = json.load(f)
-            
+
         if not history:
             return True
-            
+
         # Get last valid reading
         last_entry = history[-1]
         last_reading_str = last_entry["reading"]
-        
+
         # Clean strings to floats
         try:
             # Remove purely non-numeric tail if any, though our format is clean
             import re
+
             def parse_float(s):
                 # match first float-like pattern
-                m = re.search(r'\d+(\.\d+)?', s)
+                m = re.search(r"\d+(\.\d+)?", s)
                 if m:
                     return float(m.group(0))
                 return 0.0
 
             new_val = parse_float(new_reading_str)
             last_val = parse_float(last_reading_str)
-            
+
             logger.info(f"Validation Check: New={new_val}, Old={last_val}")
-            
+
             if new_val >= last_val:
                 # Check for massive jumps (consumption > 500 * days)
                 # Parse timestamps
@@ -130,58 +138,68 @@ def validate_reading(new_reading_str):
                     # However, "timestamp" in save_data is datetime.now().isoformat()
                     # We can assume "now" or relatively close.
                     from datetime import datetime
+
                     last_ts = datetime.fromisoformat(last_ts_str)
                     now_ts = datetime.now()
-                    
+
                     diff = now_ts - last_ts
                     days_diff = diff.total_seconds() / 86400.0
-                    
+
                     # Avoid division by zero or weirdness if ran immediately
-                    if days_diff < 0.01: 
+                    if days_diff < 0.01:
                         days_diff = 0.01
-                        
+
                     consumption = new_val - last_val
                     max_allowed = 500 * days_diff
-                    
+
                     # If it's been a long time (e.g. first run in weeks), this might be large,
                     # but 500 per day is huge (avg household is <1 m3/day).
                     # 500 is extremely generous, so it catches only massive OCR errors (decimals shift).
-                    
+
                     if consumption > max_allowed:
-                        logger.warning(f"Validation FAILED: Consumption {consumption:.2f} > Max {max_allowed:.2f} (Days: {days_diff:.2f}). Huge jump detected.")
+                        logger.warning(
+                            f"Validation FAILED: Consumption {consumption:.2f} > Max {max_allowed:.2f} (Days: {days_diff:.2f}). Huge jump detected."
+                        )
                         return False
-                        
+
                 except Exception as e:
-                    logger.warning(f"Validation timestamp check failed: {e}. Proceeding with simple check.")
+                    logger.warning(
+                        f"Validation timestamp check failed: {e}. Proceeding with simple check."
+                    )
 
                 return True
-            
+
             # Reset detection
             if new_val < 1 and last_val > 100:
-                logger.warning(f"Detected potential meter reset: {last_val} -> {new_val}. Accepting.")
+                logger.warning(
+                    f"Detected potential meter reset: {last_val} -> {new_val}. Accepting."
+                )
                 return True
-                
-            logger.warning(f"Validation FAILED: New ({new_val}) < Old ({last_val}). Ignoring.")
+
+            logger.warning(
+                f"Validation FAILED: New ({new_val}) < Old ({last_val}). Ignoring."
+            )
             return False
-            
+
         except Exception as e:
             logger.warning(f"Could not parse readings for validation: {e}. Accepting.")
-            return True # Fail open if parsing fails
-            
+            return True  # Fail open if parsing fails
+
     except Exception as e:
         logger.error(f"Error reading history for validation: {e}")
         return True
+
 
 def job():
     logger.info("Starting scraping job (v4 - tuned ocr)...")
     driver = None
     try:
         driver = get_driver()
-        
+
         # 1. Login to BVK
         logger.info("Navigating to BVK login page...")
         driver.get(BVK_URL)
-        
+
         # Accept cookies if present (based on exploration)
         try:
             cookie_btn = WebDriverWait(driver, 5).until(
@@ -195,149 +213,107 @@ def job():
         # Login
         logger.info("Logging in...")
         try:
-            WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail")))
-            driver.find_element(By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail").send_keys(USERNAME)
-            driver.find_element(By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edPassword").send_keys(PASSWORD)
+            WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located(
+                    (By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail")
+                )
+            )
+            driver.find_element(
+                By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail"
+            ).send_keys(USERNAME)
+            driver.find_element(
+                By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edPassword"
+            ).send_keys(PASSWORD)
             driver.find_element(By.ID, "btnLogin").click()
         except TimeoutException:
             logger.error(f"Login timeout. Current title: {driver.title}")
             logger.error(f"Page source snippet: {driver.page_source[:500]}")
             # Do NOT raise here if you want to retry or just log. But for now raising is fine as schedule will run again or container restarts.
-            pass # Continue to try navigation? No, login is usually required.
-            
-        
+            pass  # Continue to try navigation? No, login is usually required.
+
         # 2. Navigate to MainInfo
         logger.info("Navigating to MainInfo...")
         # Wait for login to complete (check for redirect or specific element)
-        time.sleep(2) 
+        time.sleep(2)
         driver.get(BVK_MAIN_INFO_URL)
-        
+
         # 3. Find Suez link
         logger.info("Finding Suez link...")
         suez_link = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//a[contains(@href, 'cz-sitr.suezsmartsolutions.com')]"))
+            EC.presence_of_element_located(
+                (By.XPATH, "//a[contains(@href, 'cz-sitr.suezsmartsolutions.com')]")
+            )
         )
         suez_url = suez_link.get_attribute("href")
         logger.info(f"Found Suez URL: {suez_url}")
-        
+
         # 4. Navigate to Suez
         driver.get(suez_url)
-        
+
         # 5. Extract reading
         logger.info("Extracting reading...")
-        
+
         # Wait for canvas to be present
         try:
             canvas = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, ".OdometerIndexCanvas canvas"))
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, ".OdometerIndexCanvas canvas")
+                )
             )
         except TimeoutException:
             logger.warning("Canvas not found. Checking for login button...")
             try:
                 # Try to find a login button (generic approach)
-                login_btn = driver.find_element(By.XPATH, "//input[@type='submit'] | //button[@type='submit']")
+                login_btn = driver.find_element(
+                    By.XPATH, "//input[@type='submit'] | //button[@type='submit']"
+                )
                 login_btn.click()
                 logger.info("Clicked login button. Waiting for canvas again...")
-                
+
                 canvas = WebDriverWait(driver, 20).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, ".OdometerIndexCanvas canvas"))
+                    EC.presence_of_element_located(
+                        (By.CSS_SELECTOR, ".OdometerIndexCanvas canvas")
+                    )
                 )
             except Exception as e:
                 logger.error(f"Failed to recover from login page: {e}")
-                return # Skip this run
-        
+                return  # Skip this run
+
         # Wait for animation to finish
         logger.info("Waiting for meter animation...")
         time.sleep(15)
-        
+
         # Re-acquire canvas to avoid StaleElementReferenceException
         canvas = driver.find_element(By.CSS_SELECTOR, ".OdometerIndexCanvas canvas")
 
         # Get canvas as base64 image
-        canvas_base64 = driver.execute_script("return arguments[0].toDataURL('image/png').substring(21);", canvas)
-        
+        canvas_base64 = driver.execute_script(
+            "return arguments[0].toDataURL('image/png').substring(21);", canvas
+        )
+
         # Decode and open image
         import base64
         import io
-        from PIL import Image, ImageOps
-        import pytesseract
+        from PIL import Image
+
         image_bytes = base64.b64decode(canvas_base64)
         image = Image.open(io.BytesIO(image_bytes))
-        
-        # Save RAW image for tuning
+
+        # Save RAW image for tuning (stable filename) and archive copy (timestamp-based)
         image.save(os.path.join(DATA_DIR, "raw_meter.png"))
-        
-        # Preprocessing
-        # 1. Convert to grayscale
-        image = image.convert('L')
-        
-        # 2. Resize (3x - Verified working in logs)
-        width, height = image.size
-        # Scale 3x
-        image = image.resize((width * 3, height * 3), Image.Resampling.LANCZOS)
-        
-        # 3. Handle mixed polarity
-        # Split adjusted to 0.65 based on diagnostic analysis
-        # Testing showed 0.64-0.68 all correctly read 118307, using 0.65 as middle ground
-        split_x = int(image.width * 0.65)
-        
-        left_part = image.crop((0, 0, split_x, image.height))
-        right_part = image.crop((split_x, 0, image.width, image.height))
-        
-        # Process Left (Integers)
-        left_part = ImageOps.invert(left_part)
-        left_part = ImageOps.autocontrast(left_part)
-        left_part = left_part.point(lambda x: 0 if x < 150 else 255, 'L')
-        
-        # Process Right (Decimals)
-        right_part = ImageOps.autocontrast(right_part)
-        right_part = right_part.point(lambda x: 0 if x < 150 else 255, 'L')
-          
-        # Perform OCR on parts separately
-        custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
-        custom_config_dec = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
-        
-        # 1. Integer Part (Left)
-        left_padded = ImageOps.expand(left_part, border=50, fill=255)
-        text_int = pytesseract.image_to_string(left_padded, config=custom_config).strip()
-        logger.info(f"OCR Integer Raw: {text_int}")
-        left_padded.save(os.path.join(DATA_DIR, "debug_left.png"))
-        
-        # 2. Decimal Part (Right)
-        right_padded = ImageOps.expand(right_part, border=50, fill=255)
-        text_dec = pytesseract.image_to_string(right_padded, config=custom_config_dec).strip()
-        logger.info(f"OCR Decimal Raw: {text_dec}")
-        right_padded.save(os.path.join(DATA_DIR, "debug_right.png"))
-        
-        # Process Integer
-        import re
-        val_int = "".join(re.findall(r'\d+', text_int))
-        val_int = val_int.lstrip('0') or "0"
-        
-        # Process Decimal
-        val_dec = "".join(re.findall(r'\d+', text_dec))
-        
-        # Ensure max 3 digits for decimal part
-        if len(val_dec) > 3:
-            # If we have more than 3 digits, simple truncation is the safest bet
-            # assuming digits are read left-to-right.
-            # Example: "1210" vs "720". If the first digit is correct, we keep it.
-            # But here "1" != "7". So truncation won't fix the OCR error itself,
-            # but getting the length right is a prerequisite.
-            val_dec = val_dec[:3]
-            
-        # Default to "0" if empty
-        if not val_dec:
-             val_dec = "0"
-        
-        # Concatenate with literal decimal point
-        reading = f"{val_int}.{val_dec}"
-            
+
+        captured_ts = datetime.now().isoformat(timespec="seconds")
+        safe_ts = captured_ts.replace(":", "-")
+        image_filename = f"{safe_ts}.png"
+        image.save(os.path.join(IMAGES_DIR, image_filename))
+
+        reading = ocr_meter_reading_from_image(image)
+
         logger.info(f"Formatted Reading: {reading}")
-        
+
         if reading and validate_reading(reading):
             logger.info(f"Found valid reading: {reading}")
-            save_data(reading)
+            save_data(reading, image_filename=image_filename)
         else:
             logger.warning("OCR failed or reading was rejected by validation.")
 
@@ -351,7 +327,7 @@ def job():
         except Exception as _cleanup_err:
             # Do not fail the job because of cleanup
             logger.debug(f"Could not remove error screenshot: {_cleanup_err}")
-            
+
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         if driver:
@@ -365,6 +341,7 @@ def job():
             driver.quit()
             logger.info("Driver closed.")
 
+
 def main():
     if not USERNAME or not PASSWORD:
         logger.error("BVK_USERNAME and BVK_PASSWORD environment variables must be set.")
@@ -372,6 +349,7 @@ def main():
 
     # Ensure data directory exists
     os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(IMAGES_DIR, exist_ok=True)
 
     # Run once immediately
     job()
@@ -385,6 +363,7 @@ def main():
     while True:
         schedule.run_pending()
         time.sleep(60)
+
 
 if __name__ == "__main__":
     main()

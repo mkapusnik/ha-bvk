@@ -3,3 +3,4 @@ schedule
 webdriver-manager
 pytesseract
 Pillow
+pytest
