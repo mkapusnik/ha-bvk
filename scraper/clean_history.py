@@ -5,7 +5,7 @@ DATA_DIR = "/app/data"
 HISTORY_PATH = os.path.join(DATA_DIR, "history.json")
 
 if os.path.exists(HISTORY_PATH):
-    with open(HISTORY_PATH, 'r') as f:
+    with open(HISTORY_PATH) as f:
         data = json.load(f)
     
     if data:

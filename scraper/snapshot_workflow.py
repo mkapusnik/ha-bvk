@@ -1,7 +1,7 @@
+import argparse
 import os
 import time
 from datetime import datetime
-import argparse
 
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
@@ -10,11 +10,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 # Reuse driver and config from scraper.main
 from .main import (
-    get_driver,
-    BVK_URL,
     BVK_MAIN_INFO_URL,
-    USERNAME,
+    BVK_URL,
     PASSWORD,
+    USERNAME,
+    get_driver,
     logger,
 )
 

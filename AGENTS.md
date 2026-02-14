@@ -81,11 +81,9 @@ If you create pytest tests, prefer these conventions:
 
 ### Lint/format tooling
 
-No formatter/linter config is checked in (no `ruff.toml`, `.flake8`, `pyproject` tool sections, etc.).
-If you introduce tooling, prefer Home Assistant-friendly defaults:
+Prefer Home Assistant-friendly defaults:
 - `ruff` for lint + import sorting
 - `black` for formatting (or ruff-format)
-- `mypy` only if you commit to maintaining it
 
 ## Code Style Guidelines
 
