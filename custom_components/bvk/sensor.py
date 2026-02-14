@@ -1,18 +1,19 @@
 import logging
-import aiohttp
-import async_timeout
 from datetime import timedelta
 
-from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
+import aiohttp
+import async_timeout
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.const import UnitOfVolume
 
-from .const import DOMAIN, CONF_API_URL
+from .const import CONF_API_URL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -27,6 +28,7 @@ async def async_setup_entry(
 
     async_add_entities([BvkWaterSensor(coordinator)], True)
 
+
 class BvkDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from the API."""
 
@@ -37,7 +39,7 @@ class BvkDataUpdateCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(minutes=30), # Check API every 30 mins
+            update_interval=timedelta(minutes=30),  # Check API every 30 mins
         )
 
     async def _async_update_data(self):
@@ -50,7 +52,8 @@ class BvkDataUpdateCoordinator(DataUpdateCoordinator):
                             raise UpdateFailed(f"API returned status {response.status}")
                         return await response.json()
         except Exception as err:
-            raise UpdateFailed(f"Error communicating with API: {err}")
+            raise UpdateFailed(f"Error communicating with API: {err}") from err
+
 
 class BvkWaterSensor(SensorEntity):
     """Representation of the BVK Water Sensor."""
@@ -64,7 +67,7 @@ class BvkWaterSensor(SensorEntity):
     def __init__(self, coordinator):
         """Initialize the sensor."""
         self.coordinator = coordinator
-        self._attr_unique_id = f"bvk_water_meter"
+        self._attr_unique_id = "bvk_water_meter"
         self._attr_name = "BVK Reading"
 
     @property
@@ -79,9 +82,7 @@ class BvkWaterSensor(SensorEntity):
         """Return variables that are synced to state."""
         if not self.coordinator.data:
             return {}
-        return {
-            "timestamp": self.coordinator.data.get("timestamp")
-        }
+        return {"timestamp": self.coordinator.data.get("timestamp")}
 
     @property
     def available(self) -> bool:
@@ -90,9 +91,7 @@ class BvkWaterSensor(SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""
-        self.async_on_remove(
-            self.coordinator.async_add_listener(self.async_write_ha_state)
-        )
+        self.async_on_remove(self.coordinator.async_add_listener(self.async_write_ha_state))
 
     async def async_update(self) -> None:
         """Update the entity. Only used by the generic entity update service."""

@@ -3,11 +3,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
 import pytesseract
+import pytest
 
 from scraper.ocr import ocr_meter_reading_from_path
-
 
 RESOURCES_DIR = Path(__file__).parent / "resources"
 

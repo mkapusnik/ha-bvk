@@ -4,6 +4,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Ensure `/app/scraper` is importable as the `scraper` package when
+# running `/app/main.py` from the repo root.
+ENV PYTHONPATH=/app
+
 # Install Chromium + driver (as required by the scraper)
 RUN apt-get update \
   && apt-get install -y --no-install-recommends chromium chromium-driver tesseract-ocr \

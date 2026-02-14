@@ -1,6 +1,8 @@
 import voluptuous as vol
 from homeassistant import config_entries
-from .const import DOMAIN, CONF_API_URL, DEFAULT_API_URL
+
+from .const import CONF_API_URL, DEFAULT_API_URL, DOMAIN
+
 
 class BvkWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for BVK Water Meter."""

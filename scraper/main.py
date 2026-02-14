@@ -48,7 +48,9 @@ def get_driver():
     chrome_options.add_argument("--allow-running-insecure-content")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
     )
 
     # Chromium specific options
@@ -79,7 +81,7 @@ def save_data(reading, image_filename=None):
     history = []
     if os.path.exists(history_path):
         try:
-            with open(history_path, "r") as f:
+            with open(history_path) as f:
                 history = json.load(f)
         except json.JSONDecodeError:
             logger.warning("Could not decode history.json, starting fresh.")
@@ -101,7 +103,7 @@ def validate_reading(new_reading_str):
         return True  # No history, assume valid
 
     try:
-        with open(history_path, "r") as f:
+        with open(history_path) as f:
             history = json.load(f)
 
         if not history:
@@ -154,11 +156,13 @@ def validate_reading(new_reading_str):
 
                     # If it's been a long time (e.g. first run in weeks), this might be large,
                     # but 500 per day is huge (avg household is <1 m3/day).
-                    # 500 is extremely generous, so it catches only massive OCR errors (decimals shift).
+                    # 500 is extremely generous, so it catches only massive OCR errors
+                    # (decimals shift).
 
                     if consumption > max_allowed:
                         logger.warning(
-                            f"Validation FAILED: Consumption {consumption:.2f} > Max {max_allowed:.2f} (Days: {days_diff:.2f}). Huge jump detected."
+                            f"Validation FAILED: Consumption {consumption:.2f} > Max"
+                            f" {max_allowed:.2f} (Days: {days_diff:.2f}). Huge jump detected."
                         )
                         return False
 
@@ -176,9 +180,7 @@ def validate_reading(new_reading_str):
                 )
                 return True
 
-            logger.warning(
-                f"Validation FAILED: New ({new_val}) < Old ({last_val}). Ignoring."
-            )
+            logger.warning(f"Validation FAILED: New ({new_val}) < Old ({last_val}). Ignoring.")
             return False
 
         except Exception as e:
@@ -218,17 +220,18 @@ def job():
                     (By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail")
                 )
             )
-            driver.find_element(
-                By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail"
-            ).send_keys(USERNAME)
-            driver.find_element(
-                By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edPassword"
-            ).send_keys(PASSWORD)
+            driver.find_element(By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail").send_keys(
+                USERNAME
+            )
+            driver.find_element(By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edPassword").send_keys(
+                PASSWORD
+            )
             driver.find_element(By.ID, "btnLogin").click()
         except TimeoutException:
             logger.error(f"Login timeout. Current title: {driver.title}")
             logger.error(f"Page source snippet: {driver.page_source[:500]}")
-            # Do NOT raise here if you want to retry or just log. But for now raising is fine as schedule will run again or container restarts.
+            # Do NOT raise here if you want to retry or just log. But for now raising is fine
+            # as schedule will run again or container restarts.
             pass  # Continue to try navigation? No, login is usually required.
 
         # 2. Navigate to MainInfo
@@ -256,9 +259,7 @@ def job():
         # Wait for canvas to be present
         try:
             canvas = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, ".OdometerIndexCanvas canvas")
-                )
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".OdometerIndexCanvas canvas"))
             )
         except TimeoutException:
             logger.warning("Canvas not found. Checking for login button...")
@@ -271,9 +272,7 @@ def job():
                 logger.info("Clicked login button. Waiting for canvas again...")
 
                 canvas = WebDriverWait(driver, 20).until(
-                    EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, ".OdometerIndexCanvas canvas")
-                    )
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".OdometerIndexCanvas canvas"))
                 )
             except Exception as e:
                 logger.error(f"Failed to recover from login page: {e}")
@@ -294,6 +293,7 @@ def job():
         # Decode and open image
         import base64
         import io
+
         from PIL import Image
 
         image_bytes = base64.b64decode(canvas_base64)
@@ -334,7 +334,7 @@ def job():
             try:
                 driver.save_screenshot(os.path.join(DATA_DIR, "error_screenshot.png"))
                 logger.info("Saved error screenshot.")
-            except:
+            except Exception:
                 pass
     finally:
         if driver:

@@ -9,3 +9,36 @@ dependencies = [
     "pillow>=12.0.0",
     "selenium>=4.39.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+extend-exclude = [
+    "_backup",
+    "data",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "B",
+    "UP",
+]
+
+ignore = [
+    # Home Assistant + various scripts may legitimately need broad Exception catches.
+    "B904",
+    # These scripts contain long IDs/URLs/user-agents that aren't worth wrapping.
+    "E501",
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true

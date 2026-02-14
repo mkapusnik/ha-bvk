@@ -1,9 +1,21 @@
-# Agent Instructions (HA-BVK)
+# Project Overview
+
+Purpose of this project is to provide a complete solution for integrating **Brněnské vodárny a kanalizace (BVK)** smart meter readings into Home Assistant.
 
 This repository contains:
-- `scraper/`: Selenium + Tesseract OCR service that periodically scrapes BVK portal and writes JSON into `data/`.
-- `api/`: FastAPI service that reads `data/latest.json` and `data/history.json` and exposes them via HTTP.
-- `custom_components/bvk/`: Home Assistant (HACS) custom integration that fetches `/latest` from the API.
+
+## Project Structure
+- `scraper`:
+  - Data miner that scrapes BVK portal and stores reading in `data/`
+  - Detailed implementation described in @.features/scraper.md
+  
+- `api`:
+  - HTTP service which exposes readings from `data` folder.
+  - Detailed implementation described in @.features/api.md
+
+- `custom_components/bvk/`:
+  - Home Assistant (HACS) custom integration to expose readings from `api` service as a sensor.
+  - Detailed implementation described in @.features/ha.md
 
 ## Quick Commands
 
@@ -69,11 +81,9 @@ If you create pytest tests, prefer these conventions:
 
 ### Lint/format tooling
 
-No formatter/linter config is checked in (no `ruff.toml`, `.flake8`, `pyproject` tool sections, etc.).
-If you introduce tooling, prefer Home Assistant-friendly defaults:
+Prefer Home Assistant-friendly defaults:
 - `ruff` for lint + import sorting
 - `black` for formatting (or ruff-format)
-- `mypy` only if you commit to maintaining it
 
 ## Code Style Guidelines
 
@@ -81,7 +91,6 @@ If you introduce tooling, prefer Home Assistant-friendly defaults:
 
 - Keep changes scoped: this repo has three loosely-coupled services; avoid cross-service entanglement.
 - Prefer readability over cleverness; these services run unattended and are debugged via logs.
-- Avoid breaking Home Assistant integration patterns; follow HA development guidelines when editing `custom_components/`.
 
 ### Python version / typing
 
@@ -94,7 +103,6 @@ If you introduce tooling, prefer Home Assistant-friendly defaults:
 
 - Standard library first, then third-party, then local imports.
 - One import per line; avoid wildcard imports.
-- In Home Assistant integration, keep imports aligned with HA style (group `homeassistant.*` imports together).
 
 ### Formatting
 
@@ -109,9 +117,6 @@ If you introduce tooling, prefer Home Assistant-friendly defaults:
 - Functions/variables: `snake_case`.
 - Classes: `PascalCase`.
 - Constants: `UPPER_SNAKE_CASE`.
-- Home Assistant entities:
-  - Stable `unique_id` values (do not bake in volatile values like timestamps).
-  - Keep entity name user-friendly; use `_attr_has_entity_name = True` where appropriate.
 
 ### Error handling and logging
 
@@ -120,16 +125,6 @@ If you introduce tooling, prefer Home Assistant-friendly defaults:
   - For scraper failures: current URL/title, which step failed, and a screenshot where possible.
   - For API failures: which file was missing/invalid.
 - Scraper validation intentionally "fails open" on history parsing; preserve this behavior unless you have a safer alternative.
-- In Home Assistant integration (`custom_components/bvk/`):
-  - Raise `UpdateFailed` for coordinator update issues.
-  - Do not spam logs on transient failures; rely on coordinator backoff/interval.
-
-### Async vs sync rules
-
-- Home Assistant code must be async-friendly:
-  - Do not block the event loop (no `time.sleep`, no long CPU work).
-  - Prefer HA helpers and `aiohttp` sessions provided by HA when possible.
-- API and scraper are synchronous today; keep them simple unless refactoring with a clear benefit.
 
 ### I/O, paths, and data contracts
 
@@ -139,40 +134,22 @@ If you introduce tooling, prefer Home Assistant-friendly defaults:
 - Keep the schema backward compatible; the Home Assistant sensor expects `reading` and `timestamp`.
 - Use `os.path.join` for paths; do not hardcode Windows path separators.
 
-### HTTP API conventions (`api/api.py`)
-
-- Return JSON-serializable objects only.
-- Use `HTTPException` with correct status codes:
-  - 404 when `latest.json` missing
-  - 500 when JSON decoding fails
-- Keep endpoints stable: `/latest` and `/history` are part of integration contract.
-
-### Selenium/OCR scraper conventions (`scraper/main.py`)
-
-- Any interaction with the BVK portal may change; keep selectors and waits defensive.
-- Prefer `WebDriverWait` over `time.sleep`, except for known animation delays (currently 15s).
-- When changing OCR:
-  - Save diagnostic artifacts under `data/` (already writes `raw_meter.png`, `debug_left.png`, `debug_right.png`).
-  - Keep preprocessing steps deterministic to reduce flakiness.
-- Keep validation conservative; the goal is to reject obvious OCR errors, not to overfit.
-
-### Home Assistant integration conventions (`custom_components/bvk/`)
-
-- Follow HA guidelines (async setup, coordinators, entities).
-- Avoid creating a new `aiohttp.ClientSession()` per update; prefer HA shared session if you refactor.
-- Update interval is currently 30 minutes; if you change it, justify why.
-
-## Repository-Specific Notes
-
-- Docker compose maps container port 8000 to host 8100 for the API (`http://localhost:8100/latest`).
-- `release_ha.yml` bumps `custom_components/bvk/manifest.json` patch version on pushes to `master`.
-  - Do not manually bump version unless you intentionally want a release.
-
-## When Adding New Tests (recommended structure)
-
+## Testing strategy (recommended structure)
 - Prefer `pytest`.
 - Put tests under:
   - `api/tests/` for API unit tests
   - `scraper/tests/` for OCR/HTML fixture tests (fixtures under `scraper/tests/resources/`)
   - `custom_components/bvk/tests/` only if using HA test harness
 - Keep tests offline/deterministic; use captured HTML/canvas exports as fixtures.
+
+## CI / CD
+- `tests.yml` - runs tests and if they pass, builds and pushes nightly Docker images
+- `release_ha.yml` bumps `custom_components/bvk/manifest.json` patch version on pushes to `master`, do not manually bump version.
+
+# External File Loading
+CRITICAL: When you encounter a file reference (e.g., @.features/general.md), use your Read tool to load it on a need-to-know basis. They're relevant to the SPECIFIC task at hand.
+
+Instructions:
+- Do NOT preemptively load all references - use lazy loading based on actual need
+- When loaded, treat content as mandatory instructions that override defaults
+- Follow references recursively when needed

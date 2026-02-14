@@ -1,8 +1,8 @@
 import re
 from pathlib import Path
 
-from PIL import Image, ImageOps
 import pytesseract
+from PIL import Image, ImageOps
 
 
 def _preprocess_meter_image(image: Image.Image) -> tuple[Image.Image, Image.Image]:
@@ -158,9 +158,7 @@ def _pad_to_square(image: Image.Image, *, pad: int = 20) -> Image.Image:
     return canvas
 
 
-def _split_into_digit_regions(
-    bw: Image.Image, *, expected_digits: int = 3
-) -> list[Image.Image]:
+def _split_into_digit_regions(bw: Image.Image, *, expected_digits: int = 3) -> list[Image.Image]:
     """Split a BW (mode '1') image into N digit crops using column ink counts."""
 
     img = bw.convert("1")
@@ -276,8 +274,8 @@ def _split_into_digit_regions(
 
 
 def _invert_bw(image: Image.Image) -> Image.Image:
-    l = image.convert("L")
-    inv = ImageOps.invert(l)
+    lum = image.convert("L")
+    inv = ImageOps.invert(lum)
     return inv.convert("1")
 
 
@@ -311,9 +309,7 @@ def _bw_top_band_black_ratio(bw: Image.Image, *, band_ratio: float = 0.15) -> fl
     return black / total if total else 0.0
 
 
-def _bw_top_band_black_ratio_of_ink(
-    bw: Image.Image, *, band_ratio: float = 0.15
-) -> float:
+def _bw_top_band_black_ratio_of_ink(bw: Image.Image, *, band_ratio: float = 0.15) -> float:
     img = bw.convert("1")
     cropped = _crop_to_ink(img, pad_px=0)
     if cropped is None:
@@ -407,9 +403,7 @@ def ocr_meter_reading_from_image(image: Image.Image) -> str:
                 s = _ocr_digits_scaled(_pad_to_square(part_l, pad=30), psm=10, scale=4)
                 if not re.search(r"\d", s):
                     inv_l = _invert_bw(part).convert("L")
-                    s = _ocr_digits_scaled(
-                        _pad_to_square(inv_l, pad=30), psm=10, scale=4
-                    )
+                    s = _ocr_digits_scaled(_pad_to_square(inv_l, pad=30), psm=10, scale=4)
                 d = "".join(re.findall(r"\d+", s))
                 digit = d[:1] if d else ""
                 if idx == 0 and not digit:
@@ -500,17 +494,13 @@ def ocr_meter_reading_from_path(
                 text_dec6_crop = ""
                 text_dec10_split = ""
                 if cropped_bw is not None:
-                    text_dec13_crop = _ocr_digits_scaled(
-                        cropped_bw.convert("L"), psm=13, scale=3
-                    )
+                    text_dec13_crop = _ocr_digits_scaled(cropped_bw.convert("L"), psm=13, scale=3)
                     text_dec10_crop = _ocr_digits_scaled(
                         _pad_to_square(cropped_bw.convert("L"), pad=30),
                         psm=10,
                         scale=4,
                     )
-                    text_dec6_crop = _ocr_digits_scaled(
-                        cropped_bw.convert("L"), psm=6, scale=3
-                    )
+                    text_dec6_crop = _ocr_digits_scaled(cropped_bw.convert("L"), psm=6, scale=3)
 
                     parts = _split_into_digit_regions(cropped_bw, expected_digits=3)
                     digits = []
