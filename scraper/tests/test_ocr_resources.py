@@ -25,11 +25,7 @@ def _resource_images() -> list[Path]:
     if not RESOURCES_DIR.exists():
         return []
     return sorted(
-        [
-            p
-            for p in RESOURCES_DIR.iterdir()
-            if p.is_file() and p.suffix.lower() == ".png"
-        ]
+        [p for p in RESOURCES_DIR.iterdir() if p.is_file() and p.suffix.lower() == ".png"]
     )
 
 
@@ -37,8 +33,8 @@ def _resource_images() -> list[Path]:
 def test_ocr_matches_filename(image_path: Path) -> None:
     try:
         pytesseract.get_tesseract_version()
-    except Exception:
-        pytest.skip("tesseract is not installed / not on PATH")
+    except Exception as err:
+        raise RuntimeError("tesseract is required for scraper tests") from err
     expected = _expected_from_filename(image_path)
     actual = ocr_meter_reading_from_path(image_path, debug_dir="/app/data/ocr_debug")
     assert actual == expected
