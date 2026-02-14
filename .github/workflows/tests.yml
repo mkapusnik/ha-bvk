@@ -94,8 +94,7 @@ jobs:
           python -m pip install -r custom_components/bvk/requirements_test.txt
 
       - name: Run HA integration sanity tests
-        run: python -m pytest -q
-        working-directory: custom_components/bvk/tests
+        run: python -m pytest -q custom_components/bvk/tests
 
   test-api:
     name: Test API
