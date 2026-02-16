@@ -40,10 +40,14 @@ def test_ocr_matches_all_resources() -> None:
     algorithm = os.environ.get("OCR_ALGORITHM", "tesseract_v1").strip() or "tesseract_v1"
     print(f"OCR_ALGORITHM={algorithm}")
 
+    def colorize(s: str, *, ok: bool) -> str:
+        return f"\x1b[31m{s}\x1b[0m"
+
     images = _resource_images()
     if not images:
         pytest.skip("No OCR resource images found")
 
+    rows: list[tuple[str, str, str, str]] = []
     failed: list[str] = []
     for image_path in images:
         expected = _expected_from_filename(image_path)
@@ -53,9 +57,32 @@ def test_ocr_matches_all_resources() -> None:
             config=OcrConfig(algorithm=algorithm),
         )
         ok = actual == expected
-        print(f"{image_path.name}: expected={expected} actual={actual} ok={ok}")
+        status = "OK" if ok else "FAIL"
+        rows.append((status, image_path.name, expected, actual))
         if not ok:
             failed.append(image_path.name)
 
-    print(f"Total images: {len(images)}, failed: {len(failed)}")
+    headers = ("STATUS", "IMAGE", "EXPECTED", "ACTUAL")
+    widths = [len(h) for h in headers]
+    for r in rows:
+        for i, cell in enumerate(r):
+            widths[i] = max(widths[i], len(cell))
+
+    def fmt_row(values: tuple[str, str, str, str]) -> str:
+        return " | ".join(v.ljust(widths[i]) for i, v in enumerate(values))
+
+    sep = "-+-".join("-" * w for w in widths)
+
+    print("")
+    print(fmt_row(headers))
+    print(sep)
+    for r in rows:
+        status, image, expected, actual = r
+        ok = status == "OK"
+        line = fmt_row(r)
+        print(colorize(line, ok=ok))
+    print("")
+    print(f"Total images: {len(images)}")
+    print(f"Passed: {len(images) - len(failed)}")
+    print(f"Failed: {len(failed)}")
     assert not failed, f"OCR failed for: {', '.join(failed)}"
