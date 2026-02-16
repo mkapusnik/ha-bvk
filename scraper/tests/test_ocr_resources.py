@@ -6,7 +6,7 @@ from pathlib import Path
 import pytesseract
 import pytest
 
-from scraper.ocr import ocr_meter_reading_from_path
+from scraper.ocr.api import ocr_meter_reading_from_path
 
 RESOURCES_DIR = Path(__file__).parent / "resources"
 

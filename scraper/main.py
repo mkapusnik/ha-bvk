@@ -13,7 +13,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from scraper.ocr import ocr_meter_reading_from_image
+from scraper.ocr.api import ocr_meter_reading_from_image
+from scraper.ocr.base import OcrConfig
 
 # Configure logging (stdout only, guard against double-initialization)
 _root_logger = logging.getLogger()
@@ -34,6 +35,7 @@ BVK_MAIN_INFO_URL = "https://zis.bvk.cz/Userdata/MainInfo.aspx"
 USERNAME = os.environ.get("BVK_USERNAME")
 PASSWORD = os.environ.get("BVK_PASSWORD")
 CHECK_INTERVAL_HOURS = int(os.environ.get("CHECK_INTERVAL_HOURS", 4))
+OCR_ALGORITHM = os.environ.get("OCR_ALGORITHM", "tesseract_v1")
 DATA_DIR = "/app/data"
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 
@@ -307,7 +309,7 @@ def job():
         image_filename = f"{safe_ts}.png"
         image.save(os.path.join(IMAGES_DIR, image_filename))
 
-        reading = ocr_meter_reading_from_image(image)
+        reading = ocr_meter_reading_from_image(image, config=OcrConfig(algorithm=OCR_ALGORITHM))
 
         logger.info(f"Formatted Reading: {reading}")
 
