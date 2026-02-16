@@ -8,9 +8,9 @@ import api as api_module
 
 
 @pytest.fixture()
-def client(tmp_path: Path):
+def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Patch data directory to temp folder for isolated tests
-    api_module.DATA_DIR = str(tmp_path)
+    monkeypatch.setattr(api_module, "DATA_DIR", str(tmp_path))
     return TestClient(api_module.app)
 
 
