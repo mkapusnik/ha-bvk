@@ -1,11 +1,16 @@
+import base64
+import io
 import json
 import logging
 import os
+import re
+import shutil
 import sys
 import time
 from datetime import datetime
 
 import schedule
+from PIL import Image, ImageChops, ImageOps
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
@@ -13,7 +18,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from scraper.ocr.api import ocr_meter_reading_from_image
 from scraper.ocr.base import OcrConfig
 from scraper.ocr.factory import create_ocr_engine
 
@@ -120,8 +124,6 @@ def validate_reading(new_reading_str):
         # Clean strings to floats
         try:
             # Remove purely non-numeric tail if any, though our format is clean
-            import re
-
             def parse_float(s):
                 # match first float-like pattern
                 m = re.search(r"\d+(\.\d+)?", s)
@@ -295,11 +297,6 @@ def job():
         )
 
         # Decode and open image
-        import base64
-        import io
-
-        from PIL import Image
-
         image_bytes = base64.b64decode(canvas_base64)
         image = Image.open(io.BytesIO(image_bytes))
 
@@ -307,12 +304,13 @@ def job():
         image.save(os.path.join(DATA_DIR, "raw_meter.png"))
 
         # Generate OCR debug variants for later tuning (stable filenames)
+        ocr_config = OcrConfig(algorithm=OCR_ALGORITHM)
+        engine = create_ocr_engine(ocr_config)
         try:
             os.makedirs(OCR_DEBUG_DIR, exist_ok=True)
             image.save(os.path.join(OCR_DEBUG_DIR, "raw_meter.png"))
 
             # Engine-specific preprocessed parts (if supported)
-            engine = create_ocr_engine(OcrConfig(algorithm=OCR_ALGORITHM))
             engine_debug = getattr(engine, "debug_preprocessed_parts", None)
             if callable(engine_debug):
                 left_dbg, right_dbg = engine_debug(image)
@@ -320,8 +318,6 @@ def job():
                 right_dbg.save(os.path.join(OCR_DEBUG_DIR, "pre_right.png"))
 
             # Decimals-focused debugging for live canvas (red digits)
-            from PIL import ImageChops, ImageOps
-
             rgb = image.convert("RGB")
             w, h = rgb.size
             dec_crop = rgb.crop((int(w * 0.65), 0, w, h))
@@ -340,7 +336,7 @@ def job():
         except Exception as dbg_err:
             logger.debug(f"Failed to generate OCR debug images: {dbg_err}")
 
-        reading = ocr_meter_reading_from_image(image, config=OcrConfig(algorithm=OCR_ALGORITHM))
+        reading = engine.read_meter(image)
 
         logger.info(f"Formatted Reading: {reading}")
 
@@ -366,8 +362,6 @@ def job():
 
             # Archive OCR debug folder on change
             try:
-                import shutil
-
                 archive_dir = os.path.join(OCR_DEBUG_DIR, "archive", safe_ts)
                 os.makedirs(archive_dir, exist_ok=True)
                 for name in os.listdir(OCR_DEBUG_DIR):

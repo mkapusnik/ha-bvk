@@ -27,10 +27,7 @@ def ocr_meter_reading_from_path(
         if debug_dir is not None:
             try:
                 debug_dir_p = Path(debug_dir)
-                if (
-                    debug_dir_p.is_absolute()
-                    and str(debug_dir_p).replace("\\", "/") == "/app/data/ocr_debug"
-                ):
+                if debug_dir_p.is_absolute() and debug_dir_p.as_posix() == "/app/data/ocr_debug":
                     debug_dir = Path("data") / "ocr_debug"
             except Exception:
                 pass
