@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 import base64
 import io
+import json
 import os
+import time
+from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 
 from PIL import Image
@@ -11,8 +17,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-BVK_URL = "https://zis.bvk.cz"
-BVK_MAIN_INFO_URL = "https://zis.bvk.cz/Userdata/MainInfo.aspx"
+from scraper.ocr.api import ocr_meter_reading_from_image
+from scraper.ocr.base import OcrConfig
 
 
 def _get_driver() -> webdriver.Chrome:
@@ -29,7 +35,6 @@ def _get_driver() -> webdriver.Chrome:
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
     )
-
     chrome_options.binary_location = "/usr/bin/chromium"
 
     from selenium.webdriver.chrome.service import Service
@@ -38,29 +43,20 @@ def _get_driver() -> webdriver.Chrome:
     return webdriver.Chrome(service=service, options=chrome_options)
 
 
-def download_current_meter_image(
-    output_path: str | Path, *, wait_seconds: int = 15
-) -> Path:
+def dump_live_meter_image(*, out_dir: Path, wait_seconds: int = 15) -> Image.Image:
+    bvk_url = "https://zis.bvk.cz"
+    bvk_main_info_url = "https://zis.bvk.cz/Userdata/MainInfo.aspx"
     username = os.environ.get("BVK_USERNAME")
     password = os.environ.get("BVK_PASSWORD")
     if not username or not password:
-        raise RuntimeError(
-            "BVK_USERNAME and BVK_PASSWORD must be set (use .env / docker compose)."
-        )
+        raise RuntimeError("BVK_USERNAME and BVK_PASSWORD must be set")
 
-    out_path = Path(output_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    driver: webdriver.Chrome | None = None
+    driver = None
     try:
         driver = _get_driver()
-
-        driver.get(BVK_URL)
-
-        try:
-            driver.save_screenshot(str(out_path.with_suffix(".login.png")))
-        except Exception:
-            pass
+        driver.get(bvk_url)
 
         try:
             cookie_btn = WebDriverWait(driver, 5).until(
@@ -71,31 +67,20 @@ def download_current_meter_image(
             pass
 
         WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located(
-                (By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail")
-            )
+            EC.presence_of_element_located((By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail"))
         )
-        driver.find_element(
-            By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail"
-        ).send_keys(username)
-        driver.find_element(
-            By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edPassword"
-        ).send_keys(password)
+        driver.find_element(By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edEmail").send_keys(
+            username
+        )
+        driver.find_element(By.ID, "ctl00_ctl00_lvLoginForm_LoginDialog1_edPassword").send_keys(
+            password
+        )
         driver.find_element(By.ID, "btnLogin").click()
 
-        try:
-            driver.save_screenshot(str(out_path.with_suffix(".after_login.png")))
-        except Exception:
-            pass
+        time.sleep(2)
+        driver.get(bvk_main_info_url)
 
-        driver.get(BVK_MAIN_INFO_URL)
-
-        try:
-            driver.save_screenshot(str(out_path.with_suffix(".maininfo.png")))
-        except Exception:
-            pass
-
-        suez_link = WebDriverWait(driver, 20).until(
+        suez_link = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located(
                 (By.XPATH, "//a[contains(@href, 'cz-sitr.suezsmartsolutions.com')]")
             )
@@ -105,43 +90,56 @@ def download_current_meter_image(
 
         try:
             canvas = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, ".OdometerIndexCanvas canvas")
-                )
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".OdometerIndexCanvas canvas"))
             )
         except TimeoutException:
-            login_btn = driver.find_element(
-                By.XPATH, "//input[@type='submit'] | //button[@type='submit']"
-            )
-            login_btn.click()
-            canvas = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, ".OdometerIndexCanvas canvas")
+            try:
+                login_btn = driver.find_element(
+                    By.XPATH, "//input[@type='submit'] | //button[@type='submit']"
                 )
-            )
-
-        import time
+                login_btn.click()
+                canvas = WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".OdometerIndexCanvas canvas"))
+                )
+            except Exception as e:
+                raise RuntimeError(f"Failed to find canvas/login to Suez: {e}") from e
 
         time.sleep(wait_seconds)
-
         canvas = driver.find_element(By.CSS_SELECTOR, ".OdometerIndexCanvas canvas")
+
         canvas_base64 = driver.execute_script(
             "return arguments[0].toDataURL('image/png').substring(21);", canvas
         )
-
         image_bytes = base64.b64decode(canvas_base64)
         image = Image.open(io.BytesIO(image_bytes))
-        image.save(out_path)
-        return out_path
+        image.save(out_dir / "raw_meter.png")
+        return image
     finally:
         if driver:
             driver.quit()
 
 
 def main() -> None:
-    output = os.environ.get("BVK_OUTPUT_IMAGE", "tests/resources/144_786.png")
-    saved = download_current_meter_image(output)
-    print(f"Saved: {saved}")
+    data_dir = Path(os.environ.get("DATA_DIR", "/app/data"))
+    out_dir = data_dir / "ocr_debug_live"
+    algorithm = (os.environ.get("OCR_ALGORITHM", "tesseract_v1") or "tesseract_v1").strip()
+
+    ts = datetime.now().isoformat(timespec="seconds")
+    img = dump_live_meter_image(out_dir=out_dir)
+    reading = ocr_meter_reading_from_image(img, config=OcrConfig(algorithm=algorithm))
+
+    payload = {
+        "timestamp": ts,
+        "algorithm": algorithm,
+        "reading": reading,
+    }
+    (out_dir / "result.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    # Keep a rolling archive of raw captures too
+    safe_ts = ts.replace(":", "-")
+    img.save(out_dir / f"{safe_ts}.png")
+
+    print(json.dumps(payload, indent=2))
 
 
 if __name__ == "__main__":

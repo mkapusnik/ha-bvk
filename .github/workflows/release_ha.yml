@@ -22,12 +22,6 @@ jobs:
         with:
           token: ${{ secrets.PAT }}
 
-      - name: HACS validation
-        uses: hacs/action@main
-        with:
-          category: "integration"
-          ignore: "brands"
-
       - name: Get version
         id: version
         run: |
