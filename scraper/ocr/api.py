@@ -21,6 +21,19 @@ def ocr_meter_reading_from_path(
 ) -> str:
     p = Path(path)
     with Image.open(p) as img:
+        # Ensure debug output works both on host and in Docker.
+        # If caller passes an absolute container path (e.g. /app/data/ocr_debug)
+        # but we're running on host, map it to local ./data/ocr_debug.
+        if debug_dir is not None:
+            try:
+                debug_dir_p = Path(debug_dir)
+                if (
+                    debug_dir_p.is_absolute()
+                    and str(debug_dir_p).replace("\\", "/") == "/app/data/ocr_debug"
+                ):
+                    debug_dir = Path("data") / "ocr_debug"
+            except Exception:
+                pass
         engine = create_ocr_engine(config or OcrConfig())
         if debug_dir is not None:
             try:

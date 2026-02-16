@@ -14,7 +14,9 @@ def create_ocr_engine(cfg: OcrConfig) -> OcrEngine:
         return SimpleTesseractEngine()
     if key in {"tesseract_split_digits", "split_digits", "split"}:
         return TesseractSplitDigitsEngine()
+    if key in {"tesseract_v1_legacy", "v1_legacy", "legacy"}:
+        return TesseractV1Engine()
     raise ValueError(
         "Unknown OCR algorithm. "
-        "Use one of: 'tesseract_v1', 'simple_tesseract', 'tesseract_split_digits'"
+        "Use one of: 'tesseract_v1', 'tesseract_v1_legacy', 'simple_tesseract', 'tesseract_split_digits'"
     )

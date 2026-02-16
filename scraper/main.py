@@ -15,6 +15,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from scraper.ocr.api import ocr_meter_reading_from_image
 from scraper.ocr.base import OcrConfig
+from scraper.ocr.factory import create_ocr_engine
 
 # Configure logging (stdout only, guard against double-initialization)
 _root_logger = logging.getLogger()
@@ -38,6 +39,7 @@ CHECK_INTERVAL_HOURS = int(os.environ.get("CHECK_INTERVAL_HOURS", 4))
 OCR_ALGORITHM = os.environ.get("OCR_ALGORITHM", "tesseract_v1")
 DATA_DIR = "/app/data"
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
+OCR_DEBUG_DIR = os.path.join(DATA_DIR, "ocr_debug_live")
 
 
 def get_driver():
@@ -301,20 +303,82 @@ def job():
         image_bytes = base64.b64decode(canvas_base64)
         image = Image.open(io.BytesIO(image_bytes))
 
-        # Save RAW image for tuning (stable filename) and archive copy (timestamp-based)
+        # Save RAW image for tuning (stable filename)
         image.save(os.path.join(DATA_DIR, "raw_meter.png"))
 
-        captured_ts = datetime.now().isoformat(timespec="seconds")
-        safe_ts = captured_ts.replace(":", "-")
-        image_filename = f"{safe_ts}.png"
-        image.save(os.path.join(IMAGES_DIR, image_filename))
+        # Generate OCR debug variants for later tuning (stable filenames)
+        try:
+            os.makedirs(OCR_DEBUG_DIR, exist_ok=True)
+            image.save(os.path.join(OCR_DEBUG_DIR, "raw_meter.png"))
+
+            # Engine-specific preprocessed parts (if supported)
+            engine = create_ocr_engine(OcrConfig(algorithm=OCR_ALGORITHM))
+            engine_debug = getattr(engine, "debug_preprocessed_parts", None)
+            if callable(engine_debug):
+                left_dbg, right_dbg = engine_debug(image)
+                left_dbg.save(os.path.join(OCR_DEBUG_DIR, "pre_left.png"))
+                right_dbg.save(os.path.join(OCR_DEBUG_DIR, "pre_right.png"))
+
+            # Decimals-focused debugging for live canvas (red digits)
+            from PIL import ImageChops, ImageOps
+
+            rgb = image.convert("RGB")
+            w, h = rgb.size
+            dec_crop = rgb.crop((int(w * 0.65), 0, w, h))
+            dw, dh = dec_crop.size
+            dec_crop_up = dec_crop.resize((dw * 8, dh * 8), Image.Resampling.LANCZOS)
+            dec_crop_up.save(os.path.join(OCR_DEBUG_DIR, "dec_crop.png"))
+
+            r, g, b = dec_crop_up.split()
+            avg_gb = ImageChops.add(g, b, scale=2.0)
+            red_strength = ImageChops.subtract(r, avg_gb, scale=0.5)
+            red_strength = ImageOps.autocontrast(red_strength)
+            red_strength.save(os.path.join(OCR_DEBUG_DIR, "dec_red_strength.png"))
+
+            dec_bw = red_strength.point(lambda px: 0 if px < 140 else 255, "L")
+            dec_bw.save(os.path.join(OCR_DEBUG_DIR, "dec_bw.png"))
+        except Exception as dbg_err:
+            logger.debug(f"Failed to generate OCR debug images: {dbg_err}")
 
         reading = ocr_meter_reading_from_image(image, config=OcrConfig(algorithm=OCR_ALGORITHM))
 
         logger.info(f"Formatted Reading: {reading}")
 
+        # Save timestamped screenshot only when reading changed
+        captured_ts = datetime.now().isoformat(timespec="seconds")
+        safe_ts = captured_ts.replace(":", "-")
+
+        prev_reading = None
+        latest_path = os.path.join(DATA_DIR, "latest.json")
+        if os.path.exists(latest_path):
+            try:
+                with open(latest_path) as f:
+                    prev_reading = (json.load(f) or {}).get("reading")
+            except Exception:
+                prev_reading = None
+
+        changed = prev_reading != reading
+
+        image_filename = None
+        if changed:
+            image_filename = f"{safe_ts}.png"
+            image.save(os.path.join(IMAGES_DIR, image_filename))
+
+            # Archive OCR debug folder on change
+            try:
+                import shutil
+
+                archive_dir = os.path.join(OCR_DEBUG_DIR, "archive", safe_ts)
+                os.makedirs(archive_dir, exist_ok=True)
+                for name in os.listdir(OCR_DEBUG_DIR):
+                    src = os.path.join(OCR_DEBUG_DIR, name)
+                    if os.path.isfile(src):
+                        shutil.copy2(src, os.path.join(archive_dir, name))
+            except Exception as arch_err:
+                logger.debug(f"Failed to archive OCR debug images: {arch_err}")
+
         if reading and validate_reading(reading):
-            logger.info(f"Found valid reading: {reading}")
+            logger.info(f"Found valid reading: {reading} (changed={changed})")
             save_data(reading, image_filename=image_filename)
         else:
             logger.warning("OCR failed or reading was rejected by validation.")
