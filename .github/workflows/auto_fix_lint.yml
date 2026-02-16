@@ -1,10 +1,10 @@
-name: Auto-fix lint (Gemini)
+name: (Gemini) Auto-fix sanity
 
 on:
   workflow_run:
     workflows: ['Run sanity tests']
-    types: [completed]
-    branches: [develop]
+    types: [ completed ]
+    branches: [ develop ]
 
 concurrency:
   group: auto-fix-lint-${{ github.event.workflow_run.id }}
@@ -16,65 +16,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  detect-lint-failure:
-    name: Detect lint failure
+  fix-sanity:
+    name: Fix sanity/lint and open PR
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
-    outputs:
-      should_run: ${{ steps.detect.outputs.should_run }}
-      reason: ${{ steps.detect.outputs.reason }}
-    steps:
-      - name: Fetch jobs JSON
-        id: fetch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api -H 'Accept: application/vnd.github+json' \
-            "/repos/${REPO}/actions/runs/${RUN_ID}/jobs" --paginate > jobs.json
-          echo "jobs_json<<EOF" >> "$GITHUB_OUTPUT"
-          cat jobs.json >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Detect failed lint step (from JSON)
-        id: detect
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          import os
-
-          jobs = json.loads(os.environ['JOBS_JSON'])
-          for job in jobs.get('jobs', []):
-            name = (job.get('name') or '').strip()
-            if name != 'Lint check':
-              continue
-            if job.get('conclusion') != 'failure':
-              continue
-            for step in job.get('steps') or []:
-              if (step.get('name') or '').strip() == 'Ruff check' and step.get('conclusion') == 'failure':
-                print('::notice::Detected Ruff check failure in sanity.yml')
-                with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
-                  f.write('should_run=true\n')
-                  f.write('reason=Lint check / Ruff check failed\n')
-                raise SystemExit(0)
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
-            f.write('should_run=false\n')
-            f.write('reason=Failure was not Ruff check\n')
-          PY
-        env:
-          JOBS_JSON: ${{ steps.fetch.outputs.jobs_json }}
-
-  fix-lint:
-    name: Fix lint and open PR
-    runs-on: ubuntu-latest
-    needs: detect-lint-failure
-    if: ${{ needs.detect-lint-failure.outputs.should_run == 'true' }}
     steps:
       - name: Checkout failing SHA
         uses: actions/checkout@v6
@@ -94,7 +39,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: 'lts'
 
       - name: Install Gemini CLI
         shell: bash
@@ -145,15 +90,9 @@ jobs:
             echo "No changes to commit. Exiting."
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config -g user.name "CI/CD"
           git add -A
           git commit -m "Fix ruff lint errors"
-
-      - name: Push branch
-        shell: bash
-        run: |
-          set -euo pipefail
           git push -u origin "${{ steps.branch.outputs.name }}"
 
       - name: Create pull request
