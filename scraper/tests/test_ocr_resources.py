@@ -41,7 +41,8 @@ def test_ocr_matches_all_resources() -> None:
     print(f"OCR_ALGORITHM={algorithm}")
 
     def colorize(s: str, *, ok: bool) -> str:
-        return f"\x1b[31m{s}\x1b[0m"
+        color = "32" if ok else "31"
+        return f"\x1b[{color}m{s}\x1b[0m"
 
     images = _resource_images()
     if not images:
@@ -83,6 +84,9 @@ def test_ocr_matches_all_resources() -> None:
         print(colorize(line, ok=ok))
     print("")
     print(f"Total images: {len(images)}")
-    print(f"Passed: {len(images) - len(failed)}")
-    print(f"Failed: {len(failed)}")
-    assert not failed, f"OCR failed for: {', '.join(failed)}"
+    passed_cnt = len(images) - len(failed)
+    failed_cnt = len(failed)
+    print(colorize(f"Passed: {passed_cnt}", ok=True))
+    print(colorize(f"Failed: {failed_cnt}", ok=(failed_cnt == 0)))
+    if failed:
+        pytest.fail(f"OCR failed for: {', '.join(failed)}", pytrace=False)
