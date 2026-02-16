@@ -3,8 +3,7 @@ from __future__ import annotations
 import re
 
 import pytesseract
-from PIL import Image
-from PIL import ImageOps
+from PIL import Image, ImageOps
 
 from scraper.ocr.base import OcrEngine
 

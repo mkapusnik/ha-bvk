@@ -37,3 +37,7 @@ Workflow:
   - `docker compose logs -f api`
 - Verify API:
   - `curl http://localhost:8100/latest`
+
+## Guidelines
+
+After every change, verify they pass the lint checks

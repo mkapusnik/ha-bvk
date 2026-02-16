@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from scraper.ocr.base import OcrConfig
-from scraper.ocr.base import OcrEngine
+from scraper.ocr.base import OcrConfig, OcrEngine
 from scraper.ocr.engines.simple_tesseract import SimpleTesseractEngine
-from scraper.ocr.engines.tesseract_v1 import TesseractV1Engine
 from scraper.ocr.engines.tesseract_split_digits import TesseractSplitDigitsEngine
+from scraper.ocr.engines.tesseract_v1 import TesseractV1Engine
 
 
 def create_ocr_engine(cfg: OcrConfig) -> OcrEngine:
