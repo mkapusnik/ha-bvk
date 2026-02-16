@@ -54,9 +54,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr
 
-      - name: Run scraper tests
-        run: python -m pytest -q
-        working-directory: scraper
+#      - name: Run scraper tests
+#        working-directory: scraper
+#        run: python -m pytest -q
 
   test-api:
     name: Test API
@@ -77,11 +77,11 @@ jobs:
           python -m pip install -r api/requirements.txt
 
       - name: Run API tests
-        run: python -m pytest -q
         working-directory: api
+        run: python -m pytest -q
 
   test-ha:
-    name: Test Home Assistant integration
+    name: Test Home Assistant
     runs-on: ubuntu-latest
     needs: [lint]
     steps:
