@@ -31,17 +31,31 @@ def _resource_images() -> list[Path]:
     )
 
 
-@pytest.mark.parametrize("image_path", _resource_images(), ids=lambda p: p.name)
-def test_ocr_matches_filename(image_path: Path) -> None:
+def test_ocr_matches_all_resources() -> None:
     try:
         pytesseract.get_tesseract_version()
     except Exception as err:
         raise RuntimeError("tesseract is required for scraper tests") from err
-    expected = _expected_from_filename(image_path)
-    algorithm = os.environ.get("OCR_ALGORITHM", "tesseract_v1")
-    actual = ocr_meter_reading_from_path(
-        image_path,
-        debug_dir="/app/data/ocr_debug",
-        config=OcrConfig(algorithm=algorithm),
-    )
-    assert actual == expected
+
+    algorithm = os.environ.get("OCR_ALGORITHM", "tesseract_v1").strip() or "tesseract_v1"
+    print(f"OCR_ALGORITHM={algorithm}")
+
+    images = _resource_images()
+    if not images:
+        pytest.skip("No OCR resource images found")
+
+    failed: list[str] = []
+    for image_path in images:
+        expected = _expected_from_filename(image_path)
+        actual = ocr_meter_reading_from_path(
+            image_path,
+            debug_dir="/app/data/ocr_debug",
+            config=OcrConfig(algorithm=algorithm),
+        )
+        ok = actual == expected
+        print(f"{image_path.name}: expected={expected} actual={actual} ok={ok}")
+        if not ok:
+            failed.append(image_path.name)
+
+    print(f"Total images: {len(images)}, failed: {len(failed)}")
+    assert not failed, f"OCR failed for: {', '.join(failed)}"
