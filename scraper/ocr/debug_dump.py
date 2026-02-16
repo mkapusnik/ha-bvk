@@ -5,7 +5,6 @@ import io
 import json
 import os
 import time
-from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
