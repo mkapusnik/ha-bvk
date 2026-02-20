@@ -279,6 +279,192 @@ class TesseractV1Engine(OcrEngine):
             return 0.0
         return self._bw_top_band_black_ratio(cropped, band_ratio=band_ratio)
 
+    def _bw_left_right_black_ratio(self, bw: Image.Image) -> tuple[float, float]:
+        img = bw.convert("1")
+        w, h = img.size
+        px = img.load()
+        if px is None or w <= 1 or h <= 1:
+            return 0.0, 0.0
+        mid = w // 2
+        left_black = 0
+        right_black = 0
+        left_total = mid * h
+        right_total = (w - mid) * h
+        for y in range(h):
+            for x in range(w):
+                if px[x, y] == 0:
+                    if x < mid:
+                        left_black += 1
+                    else:
+                        right_black += 1
+        left_ratio = left_black / left_total if left_total else 0.0
+        right_ratio = right_black / right_total if right_total else 0.0
+        return left_ratio, right_ratio
+
+    def _bw_top_bottom_black_ratio(self, bw: Image.Image) -> tuple[float, float]:
+        img = bw.convert("1")
+        w, h = img.size
+        px = img.load()
+        if px is None or w <= 1 or h <= 1:
+            return 0.0, 0.0
+        mid = h // 2
+        top_black = 0
+        bottom_black = 0
+        top_total = w * mid
+        bottom_total = w * (h - mid)
+        for y in range(h):
+            for x in range(w):
+                if px[x, y] == 0:
+                    if y < mid:
+                        top_black += 1
+                    else:
+                        bottom_black += 1
+        top_ratio = top_black / top_total if top_total else 0.0
+        bottom_ratio = bottom_black / bottom_total if bottom_total else 0.0
+        return top_ratio, bottom_ratio
+
+    def _count_white_holes(self, bw: Image.Image) -> int:
+        img = bw.convert("1")
+        w, h = img.size
+        px = img.load()
+        if px is None or w <= 1 or h <= 1:
+            return 0
+
+        visited = [[False] * w for _ in range(h)]
+
+        def is_white(x: int, y: int) -> bool:
+            return px[x, y] != 0
+
+        def flood(x: int, y: int) -> None:
+            stack = [(x, y)]
+            visited[y][x] = True
+            while stack:
+                cx, cy = stack.pop()
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if 0 <= nx < w and 0 <= ny < h:
+                        if not visited[ny][nx] and is_white(nx, ny):
+                            visited[ny][nx] = True
+                            stack.append((nx, ny))
+
+        for x in range(w):
+            if is_white(x, 0) and not visited[0][x]:
+                flood(x, 0)
+            if is_white(x, h - 1) and not visited[h - 1][x]:
+                flood(x, h - 1)
+        for y in range(h):
+            if is_white(0, y) and not visited[y][0]:
+                flood(0, y)
+            if is_white(w - 1, y) and not visited[y][w - 1]:
+                flood(w - 1, y)
+
+        holes = 0
+        for y in range(h):
+            for x in range(w):
+                if is_white(x, y) and not visited[y][x]:
+                    holes += 1
+                    flood(x, y)
+        return holes
+
+    def _read_decimal_split(self, right_img: Image.Image) -> tuple[str, int]:
+        fixed = self._fix_border_artifacts(right_img)
+        band = max(2, int(min(fixed.size) * 0.05))
+        borderless = self._erase_border_band(fixed, band_px=band)
+        bw = self._to_bw(borderless, cutoff=200)
+        cropped = self._crop_to_ink(bw, pad_px=10)
+        if cropped is None:
+            return "", 0
+
+        parts = self._split_into_digit_regions(cropped, expected_digits=3)
+        digits = []
+        detected = 0
+        for idx, part in enumerate(parts):
+            part = self._thicken_strokes_n(part, n=2)
+            part_l = part.convert("L")
+            w, h = part.size
+            ratio = (w / h) if h else 0.0
+            digit = ""
+            for scale in (3, 4):
+                s = self._ocr_digits_scaled(
+                    self._pad_to_square(part_l, pad=30),
+                    psm=10,
+                    scale=scale,
+                )
+                d = "".join(re.findall(r"\d+", s))
+                if d:
+                    digit = d[:1]
+                    break
+            if not digit:
+                inv_l = self._invert_bw(part).convert("L")
+                for scale in (3, 4):
+                    s = self._ocr_digits_scaled(
+                        self._pad_to_square(inv_l, pad=30),
+                        psm=10,
+                        scale=scale,
+                    )
+                    d = "".join(re.findall(r"\d+", s))
+                    if d:
+                        digit = d[:1]
+                        break
+            holes = self._count_white_holes(part)
+            if holes >= 2 and digit == "5":
+                digit = ""
+            if digit == "1" and ratio >= 0.35:
+                digit = ""
+            if digit == "2" and holes == 1:
+                left_ratio, right_ratio = self._bw_left_right_black_ratio(part)
+                if right_ratio > left_ratio * 1.2:
+                    digit = "9"
+                elif left_ratio > right_ratio * 1.2:
+                    digit = "6"
+                else:
+                    digit = "0"
+            if digit == "3" and holes == 1:
+                left_ratio, right_ratio = self._bw_left_right_black_ratio(part)
+                if abs(left_ratio - right_ratio) < 0.03:
+                    digit = "0"
+            if digit:
+                detected += 1
+            if idx == 0 and not digit:
+                black, total = self._bw_black_pixel_stats(part)
+                top_ratio = self._bw_top_band_black_ratio_of_ink(part)
+                if total and (black / total) > 0.03 and top_ratio > 0.06:
+                    digit = "7"
+            if not digit:
+                if ratio > 0 and ratio < 0.35:
+                    top_ratio, bottom_ratio = self._bw_top_bottom_black_ratio(part)
+                    if top_ratio > bottom_ratio * 1.15:
+                        digit = "7"
+                    else:
+                        digit = "1"
+                elif holes >= 2:
+                    digit = "8"
+                elif holes == 1:
+                    left_ratio, right_ratio = self._bw_left_right_black_ratio(part)
+                    top_ratio, bottom_ratio = self._bw_top_bottom_black_ratio(part)
+                    if right_ratio > left_ratio * 1.2:
+                        if abs(top_ratio - bottom_ratio) < 0.02:
+                            digit = "5"
+                        else:
+                            digit = "9"
+                    elif left_ratio > right_ratio * 1.2:
+                        if abs(top_ratio - bottom_ratio) < 0.02:
+                            digit = "6"
+                        else:
+                            digit = "0"
+                    else:
+                        digit = "0"
+                else:
+                    left_ratio, right_ratio = self._bw_left_right_black_ratio(part)
+                    top_ratio, bottom_ratio = self._bw_top_bottom_black_ratio(part)
+                    if right_ratio > left_ratio * 1.5 and abs(top_ratio - bottom_ratio) < 0.02:
+                        digit = "3"
+                    elif top_ratio > bottom_ratio * 1.15:
+                        digit = "7"
+            if not digit:
+                digit = "0"
+            digits.append(digit)
+        return "".join(digits), detected
+
     def read_meter(self, image: Image.Image) -> str:
         left_img, right_img = self._preprocess_meter_image(image)
 
@@ -344,38 +530,9 @@ class TesseractV1Engine(OcrEngine):
                 text_dec = self._ocr_digits_scaled(padded, psm=10, scale=4)
 
         if not has_3_digits(text_dec):
-            fixed = self._fix_border_artifacts(right_img)
-            band = max(2, int(min(fixed.size) * 0.05))
-            borderless = self._erase_border_band(fixed, band_px=band)
-            bw = self._to_bw(borderless, cutoff=200)
-            cropped = self._crop_to_ink(bw, pad_px=10)
-            if cropped is not None:
-                parts = self._split_into_digit_regions(cropped, expected_digits=3)
-                digits = []
-                for idx, part in enumerate(parts):
-                    part = self._thicken_strokes_n(part, n=2)
-                    part_l = part.convert("L")
-                    s = self._ocr_digits_scaled(
-                        self._pad_to_square(part_l, pad=30), psm=10, scale=4
-                    )
-                    if not re.search(r"\d", s):
-                        inv_l = self._invert_bw(part).convert("L")
-                        s = self._ocr_digits_scaled(
-                            self._pad_to_square(inv_l, pad=30),
-                            psm=10,
-                            scale=4,
-                        )
-                    d = "".join(re.findall(r"\d+", s))
-                    digit = d[:1] if d else ""
-                    if idx == 0 and not digit:
-                        black, total = self._bw_black_pixel_stats(part)
-                        top_ratio = self._bw_top_band_black_ratio_of_ink(part)
-                        if total and (black / total) > 0.03 and top_ratio > 0.06:
-                            digit = "7"
-                    if not digit:
-                        digit = "0"
-                    digits.append(digit)
-                text_dec = "".join(digits)
+            alt_dec, _detected = self._read_decimal_split(right_img)
+            if alt_dec:
+                text_dec = alt_dec
         if not re.search(r"\d", text_dec):
             fixed = self._fix_border_artifacts(right_img)
             band = max(2, int(min(fixed.size) * 0.05))
@@ -385,12 +542,46 @@ class TesseractV1Engine(OcrEngine):
             if cropped is not None:
                 text_dec = self._ocr_digits_scaled(cropped.convert("L"), psm=6, scale=3)
 
-        val_int = "".join(re.findall(r"\d+", text_int)).lstrip("0") or "0"
+        candidates: list[tuple[int, int, str]] = []
+
+        def add_candidate(text: str) -> None:
+            digits = "".join(re.findall(r"\d+", text))
+            if not digits:
+                return
+            sig_len = len(digits.lstrip("0"))
+            candidates.append((sig_len, len(digits), digits))
+
+        add_candidate(text_int)
+        for psm in (6, 8):
+            add_candidate(self._ocr_digits(left_img, psm=psm))
+
+        thick = self._thicken_strokes(left_img)
+        add_candidate(self._ocr_digits(thick, psm=7))
+
+        full = image.convert("L")
+        w, h = full.size
+        full = full.resize((w * 3, h * 3), Image.Resampling.LANCZOS)
+        full = ImageOps.autocontrast(full)
+        full = full.point(lambda x: 0 if x < 150 else 255, "L")
+        full = ImageOps.expand(full, border=50, fill=255)
+        add_candidate(self._ocr_digits(full, psm=8))
+
+        if candidates:
+            candidates.sort(reverse=True)
+            int_digits = candidates[0][2]
+        else:
+            int_digits = ""
+
+        val_int = int_digits.lstrip("0") or "0"
         val_dec = "".join(re.findall(r"\d+", text_dec))
 
         if len(val_dec) > 3:
             val_dec = val_dec[:3]
         if not val_dec:
             val_dec = "0"
+
+        alt_dec, detected = self._read_decimal_split(right_img)
+        if alt_dec and (len(val_dec) < 3 or (detected >= 2 and alt_dec != val_dec)):
+            val_dec = alt_dec
 
         return f"{val_int}.{val_dec}"
