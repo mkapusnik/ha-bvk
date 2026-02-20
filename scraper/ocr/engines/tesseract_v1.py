@@ -406,6 +406,11 @@ class TesseractV1Engine(OcrEngine):
                         digit = d[:1]
                         break
             holes = self._count_white_holes(part)
+            if digit == "5" and holes == 0:
+                left_ratio, right_ratio = self._bw_left_right_black_ratio(part)
+                top_ratio, bottom_ratio = self._bw_top_bottom_black_ratio(part)
+                if left_ratio > right_ratio * 1.5 and top_ratio > bottom_ratio * 1.15:
+                    digit = "9"
             if holes >= 2 and digit == "5":
                 digit = ""
             if digit == "1" and ratio >= 0.35:
@@ -432,17 +437,29 @@ class TesseractV1Engine(OcrEngine):
             if not digit:
                 if ratio > 0 and ratio < 0.35:
                     top_ratio, bottom_ratio = self._bw_top_bottom_black_ratio(part)
-                    if top_ratio > bottom_ratio * 1.15:
-                        digit = "7"
-                    else:
-                        digit = "1"
+                    left_ratio, right_ratio = self._bw_left_right_black_ratio(part)
+                    diff_tb = abs(top_ratio - bottom_ratio)
+                    if holes >= 1:
+                        if abs(left_ratio - right_ratio) < 0.03:
+                            if diff_tb > 0.03:
+                                digit = "0"
+                            elif diff_tb < 0.02:
+                                digit = "8"
+                    if not digit:
+                        if top_ratio > bottom_ratio * 1.15:
+                            digit = "7"
+                        else:
+                            digit = "1"
                 elif holes >= 2:
                     digit = "8"
                 elif holes == 1:
                     left_ratio, right_ratio = self._bw_left_right_black_ratio(part)
                     top_ratio, bottom_ratio = self._bw_top_bottom_black_ratio(part)
                     if right_ratio > left_ratio * 1.2:
-                        if abs(top_ratio - bottom_ratio) < 0.02:
+                        diff_tb = abs(top_ratio - bottom_ratio)
+                        if diff_tb < 0.006:
+                            digit = "1"
+                        elif diff_tb < 0.02:
                             digit = "5"
                         else:
                             digit = "9"
