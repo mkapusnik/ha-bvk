@@ -6,9 +6,7 @@ function createApp(options = {}) {
   const dataDir = options.dataDir || process.env.DATA_DIR || '/app/data';
   const app = express();
 
-  app.get('/', (req, res) => {
-    res.json({ status: 'ok', service: 'bvk-scraper-api' });
-  });
+  app.use(express.static(path.join(__dirname, 'public')));
 
   app.get('/latest', async (req, res) => {
     const filePath = path.join(dataDir, 'latest.json');

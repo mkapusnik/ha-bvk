@@ -26,10 +26,13 @@ afterEach(async () => {
   }
 });
 
-test('root returns ok status', async () => {
+test('root returns landing page', async () => {
+  const filePath = path.join(__dirname, '..', 'public', 'index.html');
+  const expectedHtml = await fs.readFile(filePath, 'utf-8');
   const response = await request(app).get('/');
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body, { status: 'ok', service: 'bvk-scraper-api' });
+  assert.equal(response.headers['content-type'].includes('text/html'), true);
+  assert.equal(response.text.trim(), expectedHtml.trim());
 });
 
 test('latest returns 404 when missing', async () => {
