@@ -51,11 +51,6 @@ Notes:
 
 ## Tests / Lint
 
-### CI reality check
-
-`.github/workflows/tests.yml` currently builds and pushes Docker images; it does not run unit tests or linters.
-If you add tests, consider updating CI to execute them.
-
 ### OCR tests (recommended)
 
 The OCR unit test uses `pytesseract` which calls the `tesseract` binary.
@@ -95,7 +90,6 @@ Prefer Home Assistant-friendly defaults:
 ### Python version / typing
 
 - `pyproject.toml` declares `requires-python = ">=3.14"`, but containers may run older versions.
-  - Write code compatible with Python 3.11+ unless you confirm runtime.
 - Use type hints for new/modified functions where helpful, but do not introduce heavy typing overhead.
 - Prefer built-in collections (`list`, `dict`) and `typing` only when it improves clarity.
 
