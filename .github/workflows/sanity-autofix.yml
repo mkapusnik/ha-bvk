@@ -78,8 +78,7 @@ jobs:
           4) Do not run formatting unless needed.
           EOF
 
-          gemini --non-interactive \
-            --prompt "$(cat AGENT_INSTRUCTIONS.txt)" \
+          gemini --prompt "$(cat AGENT_INSTRUCTIONS.txt)" \
             -- "bash" "-lc" "ruff check . || true; ruff check . --fix || true; ruff check ."
 
       - name: Commit changes (if any)
