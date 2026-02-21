@@ -26,4 +26,5 @@ Endpoints:
 ### Static assets
 
 - Landing page files live in `api/public/` and are served as static assets.
+- Prefer separate, cacheable files for CSS/JS instead of inline blocks in HTML.
 - When updating the landing page, ensure the API Docker image includes `api/public/`.
