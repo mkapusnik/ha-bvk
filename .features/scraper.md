@@ -25,6 +25,7 @@ Workflow:
   - Save diagnostic artifacts under `data/` (already writes `raw_meter.png`, `debug_left.png`, `debug_right.png`).
   - Keep preprocessing steps deterministic to reduce flakiness.
 - Keep validation conservative; the goal is to reject obvious OCR errors, not to overfit.
+- Format of the meter value is always `XXXXXX.YYY` where `XXXXXX` is the integer part of the value, left-padded with zeroes. `YYY` is the decimal part.
 
 ## Quick Commands
 
@@ -40,4 +41,4 @@ Workflow:
 
 ## Guidelines
 
-After every change, verify they pass the lint checks
+After every change, verify the lint checks are passing
