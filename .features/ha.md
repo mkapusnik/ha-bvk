@@ -7,6 +7,7 @@ Provide custom component for Home Assistant server.
 
 ## Implementation
 Custom component for Home Assistant server that fetches `/latest` from the API and exposes it as a sensor.
+The API root (`/`) now serves a landing page, but the integration continues to use `/latest`.
 
 Home Assistant code must be async-friendly:
   - Do not block the event loop (no `time.sleep`, no long CPU work).

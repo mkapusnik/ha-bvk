@@ -11,6 +11,7 @@ This repository contains:
   
 - `api`:
   - HTTP service which exposes readings from `data` folder.
+  - Serves a landing page at `/` from `api/public/index.html`.
   - Detailed implementation described in @.features/api.md
 
 - `custom_components/bvk/`:

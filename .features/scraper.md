@@ -37,7 +37,8 @@ Workflow:
   - `docker compose logs -f scraper`
   - `docker compose logs -f api`
 - Verify API:
-  - `curl http://localhost:8100/latest`
+  - `curl http://localhost:8100/latest` (JSON)
+  - `http://localhost:8100/` (landing page)
 
 ## Guidelines
 
