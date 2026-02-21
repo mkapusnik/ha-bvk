@@ -34,10 +34,10 @@ This repository contains:
 ### Run locally (no Docker)
 
 API:
-- Create venv, install deps:
-  - `python -m venv .venv && .venv\\Scripts\\pip install -r api/requirements.txt`
+- Install deps:
+  - `npm install --prefix api`
 - Run:
-  - `python api/api.py` (uses `uvicorn.run(...)`)
+  - `node api/index.js`
 
 Scraper:
 - Install deps:
@@ -80,6 +80,9 @@ Prefer Home Assistant-friendly defaults:
 - `ruff` for lint + import sorting
 - `black` for formatting (or ruff-format)
 
+API tests:
+- `npm test --prefix api`
+
 ## Code Style Guidelines
 
 ### General
@@ -93,6 +96,11 @@ Prefer Home Assistant-friendly defaults:
 - Use type hints for new/modified functions where helpful, but do not introduce heavy typing overhead.
 - Prefer built-in collections (`list`, `dict`) and `typing` only when it improves clarity.
 
+### JavaScript (API)
+
+- Use Node 20+ and CommonJS modules (see `api/package.json`).
+- Keep async filesystem access and JSON parsing behavior aligned with existing API contract.
+
 ### Imports
 
 - Standard library first, then third-party, then local imports.
@@ -100,14 +108,14 @@ Prefer Home Assistant-friendly defaults:
 
 ### Formatting
 
-- Use 4-space indentation.
+- Use 4-space indentation in Python.
 - Prefer single quotes only when needed; otherwise be consistent within the file.
 - Keep lines reasonably short (~88-100 chars) unless constrained by HA constants / long selectors.
 - JSON written to disk should remain stable and human-readable (keep `indent=2`).
 
 ### Naming conventions
 
-- Modules/files: `snake_case.py`.
+- Modules/files: `snake_case.py` for Python, `kebab-case` or `camelCase` for JS as appropriate.
 - Functions/variables: `snake_case`.
 - Classes: `PascalCase`.
 - Constants: `UPPER_SNAKE_CASE`.
@@ -126,10 +134,10 @@ Prefer Home Assistant-friendly defaults:
   - `data/latest.json` is a dict with keys: `timestamp` (ISO string), `reading` (string like `"123.456"`).
   - `data/history.json` is a list of those dicts.
 - Keep the schema backward compatible; the Home Assistant sensor expects `reading` and `timestamp`.
-- Use `os.path.join` for paths; do not hardcode Windows path separators.
+- Use `os.path.join` (Python) or `path.join` (Node) for paths; do not hardcode Windows path separators.
 
 ## Testing strategy (recommended structure)
-- Prefer `pytest`.
+- Prefer `pytest` for Python and `node:test` for the API.
 - Put tests under:
   - `api/tests/` for API unit tests
   - `scraper/tests/` for OCR/HTML fixture tests (fixtures under `scraper/tests/resources/`)

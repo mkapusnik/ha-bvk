@@ -1,0 +1,17 @@
+{
+  "name": "bvk-api",
+  "version": "1.0.0",
+  "description": "HTTP API for BVK readings",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0"
+  }
+}
