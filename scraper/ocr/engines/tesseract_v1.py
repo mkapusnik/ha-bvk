@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 import pytesseract
-from PIL import Image, ImageOps
+from PIL import Image, ImageChops, ImageOps
 
 from scraper.ocr.base import OcrEngine
 
@@ -110,6 +110,24 @@ class TesseractV1Engine(OcrEngine):
         gray = image.convert("L")
         thr = gray.point(lambda px: 0 if px < cutoff else 255, "L")
         return thr.convert("1")
+
+    def _extract_red_ink_bw(self, image: Image.Image) -> Image.Image:
+        """Extract red digits into a BW mask."""
+
+        rgb = image.convert("RGB")
+
+        w, h = rgb.size
+        dec = rgb.crop((int(w * 0.65), 0, w, h))
+        dw, dh = dec.size
+        dec = dec.resize((dw * 8, dh * 8), Image.Resampling.LANCZOS)
+
+        r, g, b = dec.split()
+        avg_gb = ImageChops.add(g, b, scale=2.0)
+        red_strength = ImageChops.subtract(r, avg_gb, scale=0.5)
+        red_strength = ImageOps.autocontrast(red_strength)
+
+        bw = red_strength.point(lambda px: 0 if px < 140 else 255, "L")
+        return bw.convert("1")
 
     def _fix_border_artifacts(self, image: Image.Image) -> Image.Image:
         w, h = image.size
@@ -378,6 +396,12 @@ class TesseractV1Engine(OcrEngine):
         digits = []
         detected = 0
         for idx, part in enumerate(parts):
+            black, total = self._bw_black_pixel_stats(part)
+            if total and (black / total) > 0.55:
+                part = self._invert_bw(part)
+            cropped_part = self._crop_to_ink(part, pad_px=12)
+            if cropped_part is not None:
+                part = cropped_part
             part = self._thicken_strokes_n(part, n=2)
             part_l = part.convert("L")
             w, h = part.size
@@ -547,6 +571,12 @@ class TesseractV1Engine(OcrEngine):
                 text_dec = self._ocr_digits_scaled(padded, psm=10, scale=4)
 
         if not has_3_digits(text_dec):
+            red_bw = self._extract_red_ink_bw(image)
+            red_cropped = self._crop_to_ink(red_bw, pad_px=12)
+            red_base = red_cropped if red_cropped is not None else red_bw
+            text_dec = self._ocr_digits_scaled(red_base.convert("L"), psm=7, scale=3)
+
+        if not has_3_digits(text_dec):
             alt_dec, _detected = self._read_decimal_split(right_img)
             if alt_dec:
                 text_dec = alt_dec
@@ -559,21 +589,33 @@ class TesseractV1Engine(OcrEngine):
             if cropped is not None:
                 text_dec = self._ocr_digits_scaled(cropped.convert("L"), psm=6, scale=3)
 
-        candidates: list[tuple[int, int, str]] = []
+        red_dec = ""
+        try:
+            red_bw = self._extract_red_ink_bw(image)
+            red_text = self._ocr_digits_scaled(red_bw.convert("L"), psm=7, scale=3)
+            red_dec = "".join(re.findall(r"\d+", red_text))
+        except Exception:
+            red_dec = ""
 
-        def add_candidate(text: str) -> None:
+        candidates: list[tuple[int, int, str]] = []
+        left_candidates: list[tuple[int, int, str]] = []
+
+        def add_candidate(text: str, *, left: bool = False) -> None:
             digits = "".join(re.findall(r"\d+", text))
             if not digits:
                 return
             sig_len = len(digits.lstrip("0"))
-            candidates.append((sig_len, len(digits), digits))
+            entry = (sig_len, len(digits), digits)
+            candidates.append(entry)
+            if left:
+                left_candidates.append(entry)
 
-        add_candidate(text_int)
+        add_candidate(text_int, left=True)
         for psm in (6, 8):
-            add_candidate(self._ocr_digits(left_img, psm=psm))
+            add_candidate(self._ocr_digits(left_img, psm=psm), left=True)
 
         thick = self._thicken_strokes(left_img)
-        add_candidate(self._ocr_digits(thick, psm=7))
+        add_candidate(self._ocr_digits(thick, psm=7), left=True)
 
         full = image.convert("L")
         w, h = full.size
@@ -583,11 +625,15 @@ class TesseractV1Engine(OcrEngine):
         full = ImageOps.expand(full, border=50, fill=255)
         add_candidate(self._ocr_digits(full, psm=8))
 
-        if candidates:
-            candidates.sort(reverse=True)
-            int_digits = candidates[0][2]
-        else:
-            int_digits = ""
+        int_digits = ""
+        if left_candidates:
+            left_candidates.sort(reverse=True)
+            if left_candidates[0][0] >= 2:
+                int_digits = left_candidates[0][2]
+        if not int_digits:
+            if candidates:
+                candidates.sort(reverse=True)
+                int_digits = candidates[0][2]
 
         val_int = int_digits.lstrip("0") or "0"
         val_dec = "".join(re.findall(r"\d+", text_dec))
@@ -600,5 +646,11 @@ class TesseractV1Engine(OcrEngine):
         alt_dec, detected = self._read_decimal_split(right_img)
         if alt_dec and (len(val_dec) < 3 or (detected >= 2 and alt_dec != val_dec)):
             val_dec = alt_dec
+
+        if red_dec:
+            if len(red_dec) > 3:
+                red_dec = red_dec[:3]
+            if len(red_dec) == 3 and red_dec != val_dec:
+                val_dec = red_dec
 
         return f"{val_int}.{val_dec}"
