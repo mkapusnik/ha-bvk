@@ -41,6 +41,27 @@ class TesseractV1Engine(OcrEngine):
 
         return left_padded, right_padded
 
+    def _preprocess_left_variants(self, image: Image.Image) -> list[Image.Image]:
+        gray = image.convert("L")
+        width, height = gray.size
+        gray = gray.resize((width * 3, height * 3), Image.Resampling.LANCZOS)
+        split_x = int(gray.width * 0.65)
+        left = gray.crop((0, 0, split_x, gray.height))
+
+        inv = ImageOps.invert(left)
+        inv = ImageOps.autocontrast(inv)
+
+        variants: list[Image.Image] = []
+        for cutoff in (120, 150, 180):
+            thr = inv.point(lambda x: 0 if x < cutoff else 255, "L")
+            variants.append(ImageOps.expand(thr, border=50, fill=255))
+
+        direct = ImageOps.autocontrast(left)
+        direct = direct.point(lambda x: 0 if x < 120 else 255, "L")
+        variants.append(ImageOps.expand(direct, border=50, fill=255))
+
+        return variants
+
     def debug_preprocessed_parts(self, image: Image.Image) -> tuple[Image.Image, Image.Image]:
         return self._preprocess_meter_image(image)
 
@@ -611,6 +632,9 @@ class TesseractV1Engine(OcrEngine):
                 left_candidates.append(entry)
 
         add_candidate(text_int, left=True)
+        for variant in self._preprocess_left_variants(image):
+            add_candidate(self._ocr_digits(variant, psm=7), left=True)
+            add_candidate(self._ocr_digits(variant, psm=8), left=True)
         for psm in (6, 8):
             add_candidate(self._ocr_digits(left_img, psm=psm), left=True)
 
@@ -627,9 +651,20 @@ class TesseractV1Engine(OcrEngine):
 
         int_digits = ""
         if left_candidates:
-            left_candidates.sort(reverse=True)
-            if left_candidates[0][0] >= 2:
-                int_digits = left_candidates[0][2]
+            sig_len_counts: dict[int, int] = {}
+            for sig_len, _total_len, _digits in left_candidates:
+                sig_len_counts[sig_len] = sig_len_counts.get(sig_len, 0) + 1
+            preferred_lengths = [
+                length for length, count in sig_len_counts.items() if length >= 3 and count >= 2
+            ]
+            if preferred_lengths:
+                best_len = max(preferred_lengths, key=lambda length: (sig_len_counts[length], length))
+            else:
+                best_len = max(sig_len_counts.items(), key=lambda item: (item[1], item[0]))[0]
+            preferred = [c for c in left_candidates if c[0] == best_len]
+            preferred.sort(reverse=True)
+            if preferred and preferred[0][0] >= 2:
+                int_digits = preferred[0][2]
         if not int_digits:
             if candidates:
                 candidates.sort(reverse=True)
