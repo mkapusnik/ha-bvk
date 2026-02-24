@@ -41,10 +41,6 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      - name: Install Gemini CLI
-        shell: bash
-        run: npm install -g @google/gemini-cli
-
       - name: Create lint branch
         id: branch
         shell: bash
@@ -55,31 +51,13 @@ jobs:
           git checkout -b "$branch"
           echo "name=$branch" >> "$GITHUB_OUTPUT"
 
-      - name: Run Gemini agent to fix ruff
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Run ruff auto-fix
         shell: bash
         run: |
           set -euo pipefail
-          cat > AGENT_INSTRUCTIONS.txt <<'EOF'
-          You are an automated lint-fix agent running in GitHub Actions.
-
-          Goal: fix all lint issues reported by `ruff check .`.
-
-          Rules:
-          - Make the smallest safe changes.
-          - Do not change runtime behavior unless required to fix lint.
-          - Keep edits focused; avoid refactors.
-
-          Steps:
-          1) Run: ruff check .
-          2) Fix issues (use ruff auto-fix if appropriate).
-          3) Re-run: ruff check . until it exits 0.
-          4) Do not run formatting unless needed.
-          EOF
-
-          gemini --prompt "$(cat AGENT_INSTRUCTIONS.txt)" \
-            -- "bash" "-lc" "ruff check . || true; ruff check . --fix || true; ruff check ."
+          ruff check . || true
+          ruff check . --fix
+          ruff check .
 
       - name: Commit changes (if any)
         shell: bash
