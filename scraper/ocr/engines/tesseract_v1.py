@@ -662,9 +662,22 @@ class TesseractV1Engine(OcrEngine):
             else:
                 best_len = max(sig_len_counts.items(), key=lambda item: (item[1], item[0]))[0]
             preferred = [c for c in left_candidates if c[0] == best_len]
-            preferred.sort(reverse=True)
-            if preferred and preferred[0][0] >= 2:
-                int_digits = preferred[0][2]
+            if preferred:
+                digit_counts: dict[str, int] = {}
+                max_len_for: dict[str, int] = {}
+                for _sig_len, total_len, digits in preferred:
+                    digit_counts[digits] = digit_counts.get(digits, 0) + 1
+                    prev_len = max_len_for.get(digits, 0)
+                    if total_len > prev_len:
+                        max_len_for[digits] = total_len
+                ranked = sorted(
+                    digit_counts.items(),
+                    key=lambda item: (item[1], max_len_for.get(item[0], 0), item[0]),
+                    reverse=True,
+                )
+                top_digits = ranked[0][0]
+                if len(top_digits.lstrip("0")) >= 2:
+                    int_digits = top_digits
         if not int_digits:
             if candidates:
                 candidates.sort(reverse=True)
