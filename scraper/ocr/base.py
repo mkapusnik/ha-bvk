@@ -9,8 +9,6 @@ from PIL import Image
 class OcrConfig:
     """Configuration for OCR reading extraction."""
 
-    algorithm: str = "tesseract_v1"
-
 
 class OcrEngine:
     name: str

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
@@ -8,7 +7,6 @@ import pytesseract
 import pytest
 
 from scraper.ocr.api import ocr_meter_reading_from_path
-from scraper.ocr.base import OcrConfig
 
 RESOURCES_DIR = Path(__file__).parent / "resources"
 
@@ -37,9 +35,6 @@ def test_ocr_matches_all_resources() -> None:
     except Exception as err:
         raise RuntimeError("tesseract is required for scraper tests") from err
 
-    algorithm = os.environ.get("OCR_ALGORITHM", "tesseract_v1").strip() or "tesseract_v1"
-    print(f"OCR_ALGORITHM={algorithm}")
-
     def colorize(s: str, *, ok: bool) -> str:
         color = "32" if ok else "31"
         return f"\x1b[{color}m{s}\x1b[0m"
@@ -52,11 +47,7 @@ def test_ocr_matches_all_resources() -> None:
     failed: list[str] = []
     for image_path in images:
         expected = _expected_from_filename(image_path)
-        actual = ocr_meter_reading_from_path(
-            image_path,
-            debug_dir="/app/data/ocr_debug",
-            config=OcrConfig(algorithm=algorithm),
-        )
+        actual = ocr_meter_reading_from_path(image_path, debug_dir="/app/data/ocr_debug")
         ok = actual == expected
         status = "OK" if ok else "FAIL"
         rows.append((status, image_path.name, expected, actual))

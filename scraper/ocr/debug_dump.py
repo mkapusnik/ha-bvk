@@ -17,7 +17,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from scraper.ocr.api import ocr_meter_reading_from_image
-from scraper.ocr.base import OcrConfig
 
 
 def _get_driver() -> webdriver.Chrome:
@@ -121,15 +120,12 @@ def dump_live_meter_image(*, out_dir: Path, wait_seconds: int = 15) -> Image.Ima
 def main() -> None:
     data_dir = Path(os.environ.get("DATA_DIR", "/app/data"))
     out_dir = data_dir / "ocr_debug_live"
-    algorithm = (os.environ.get("OCR_ALGORITHM", "tesseract_v1") or "tesseract_v1").strip()
-
     ts = datetime.now().isoformat(timespec="seconds")
     img = dump_live_meter_image(out_dir=out_dir)
-    reading = ocr_meter_reading_from_image(img, config=OcrConfig(algorithm=algorithm))
+    reading = ocr_meter_reading_from_image(img)
 
     payload = {
         "timestamp": ts,
-        "algorithm": algorithm,
         "reading": reading,
     }
     (out_dir / "result.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
